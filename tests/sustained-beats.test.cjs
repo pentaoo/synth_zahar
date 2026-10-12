@@ -44,8 +44,9 @@ for(const kind of ['Gain','DynamicsCompressor','Analyser','BiquadFilter','WaveSh
   AudioContext.prototype['create'+kind]=function(){const node=new AudioNode(kind);this.nodes.push(node);return node;};
 }
 async function fixture(steps) {
-  const context=vm.createContext({window:{AudioContext},Float32Array,Uint8Array,console});
+  const context=vm.createContext({window:{AudioContext,LandscapeFiles:require('../sketches/landscape/layout-files.js')},Float32Array,Uint8Array,console});
   vm.runInContext(`
+    const layoutFiles=window.LandscapeFiles;let layoutName='';
     const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
     const PITCH_MIN=48,PITCH_SPAN=24,MAX_SOURCES=16;
     let phraseLength=8,playingStep=null,running=true,activatedHeld=new Set(),worldKey='autumn',selectedId=1,tool='fog',bpm=80,nextId=2,showAudio=false;

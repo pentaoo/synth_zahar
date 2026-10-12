@@ -2,6 +2,8 @@
 (() => {
   'use strict';
   const STORAGE_KEY = 'landscape-mechanics-v1';
+  const layoutFiles = window.LandscapeFiles;
+  let layoutName = '';
   let savedState = null;
   try { const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); savedState = stored?.privateContent || stored; } catch {}
   const root=document.getElementById('landscape-lab-01');
@@ -87,9 +89,10 @@
   const typeColor = type => ({drop:'#789fba',leaf:'#a7a36a',raven:'#677b66',fog:'#96b8a5',comet:'#9892c5',star:'#c3ac73',asteroid:'#8596aa',aurora:'#a19cc8'}[type] || world().color);
   let inspectorTab = 'source';
   function openInspector(tab) {
+    if(inspectorTab!==tab)q('.inspector-scroll').scrollTop=0;
     inspectorTab = tab;
     all('[data-inspector-tab]').forEach(button => { const active = button.dataset.inspectorTab === tab; button.setAttribute('aria-selected', String(active)); button.tabIndex = active ? 0 : -1; });
-    q('#source-panel').hidden = tab !== 'source'; q('#sound-panel').hidden = tab !== 'sound';
+    for(const name of ['source','sound','layouts'])q('#'+name+'-panel').hidden=tab!==name;
   }
   function formatParameter(key, value) {
     if (key.endsWith('pan')) return Math.abs(value) < .01 ? 'Центр' : (value < 0 ? 'L ' : 'R ') + Math.round(Math.abs(value) * 100) + '%';
@@ -357,7 +360,7 @@
   }
   const sound=new Sound();
   function serial() {
-    return {version:5, worldKey, bpm, phraseLength, selectedId, tool, nextId, showAudio,
+    return {version:5, worldKey, bpm, phraseLength, selectedId, tool, nextId, showAudio, layoutName,
       scaleSettings:clone(scaleSettings), scenes:clone(scenes), waveforms:clone(waveforms), soundSettings:clone(soundSettings)};
   }
   function persist() {
@@ -367,6 +370,7 @@
   }
   function restore(saved){
     if(!saved||![1,2,3,4,5].includes(saved.version)||!worlds[saved.worldKey])return;
+    layoutName=layoutFiles.normalizeName(saved.layoutName);
     for(const key of Object.keys(worlds)){const settings=saved.scaleSettings?.[key];scaleSettings[key]=saved.version>=2&&Number.isInteger(settings?.tonic)&&settings.tonic>=0&&settings.tonic<12&&Object.hasOwn(modes,settings.mode)?{tonic:settings.tonic,mode:settings.mode}:{tonic:0,mode:key==='autumn'?'majorPent':'minorPent'};}
     const clean={};let maxId=0;
     for(const key of Object.keys(worlds)){if(!Array.isArray(saved.scenes?.[key]))return;clean[key]=saved.scenes[key].slice(0,MAX_SOURCES).filter(e=>Number.isInteger(e.id)&&worlds[key].types.some(t=>t.id===e.type)&&Number.isFinite(e.x)&&Number.isFinite(e.y)).map(e=>{maxId=Math.max(maxId,e.id);const x=saved.version===1?(worlds[key].notes[Math.round(clamp(e.x,0,1)*10)]-PITCH_MIN)/PITCH_SPAN:e.x;const sustained=worlds[key].types.find(t=>t.id===e.type).sustained;const steps=sustained&&saved.version<5?allPhraseSteps():saved.version>=3?Array.isArray(e.steps)?[...new Set(e.steps.filter(step=>Number.isInteger(step)&&step>=0&&step<32))].sort((a,b)=>a-b):[0]:legacySteps([.5,1,2,4].includes(e.interval)?e.interval:2);return {id:e.id,type:e.type,x:snapX(x,key),y:clamp(e.y,.08,.92),muted:!!e.muted,steps,sound:cleanSourceSettings(e.sound,e.type)};});}
@@ -376,6 +380,41 @@
     for(const key of Object.keys(worlds)){const arr=saved.waveforms?.[key];if(Array.isArray(arr)&&arr.length===2&&arr.every(v=>['sine','triangle','sawtooth','square'].includes(v)))waveforms[key]=arr;}
   }
   restore(window.openai?.widgetState?.privateContent || savedState);
+  function layoutStatus(message,error=false){
+    const output=q('[data-layout-status]');output.textContent=message;output.dataset.state=error?'error':'success';
+    status(message);
+  }
+  function exportLayout(){
+    try {
+      layoutName=layoutFiles.normalizeName(q('[data-control="layout-name"]').value)||world().name+' — моя композиция';
+      const filename=layoutFiles.filename(layoutName),contents=layoutFiles.encode(serial(),layoutName);
+      const url=URL.createObjectURL(new Blob([contents],{type:'application/json;charset=utf-8'}));
+      const link=document.createElement('a');link.href=url;link.download=filename;link.hidden=true;
+      document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+      persist();syncLayout();layoutStatus('Файл «'+filename+'» отправлен в загрузки.');
+    } catch(error){layoutStatus('Не удалось сохранить раскладку: '+error.message,true);}
+  }
+  async function importLayout(file){
+    if(!file)return;
+    const button=q('[data-action="import-layout"]');button.disabled=true;
+    try {
+      if(file.size>layoutFiles.MAX_BYTES)throw new Error('Файл слишком большой. Максимум — 1 МБ.');
+      const imported=layoutFiles.decode(await file.text());
+      // Validate the entire file before changing the current composition.
+      remember();running=false;resetTransport();restore(imported.snapshot);
+      layoutName=imported.name||layoutFiles.normalizeName(file.name.replace(/(?:\.landscape)?\.json$/i,''))||'Импортированная композиция';
+      ghost=null;commit();openInspector('layouts');
+      layoutStatus('Открыта раскладка «'+layoutName+'». Нажми «Играть», чтобы послушать.');
+    } catch(error){layoutStatus(error.message||'Не удалось прочитать раскладку.',true);}
+    finally {button.disabled=false;q('[data-control="layout-file"]').value='';}
+  }
+  function syncLayout(){
+    const input=q('[data-control="layout-name"]');
+    if(document.activeElement!==input)input.value=layoutName||world().name+' — моя композиция';
+    const plural=(count,forms)=>forms[count%100>=11&&count%100<=14?2:count%10===1?0:count%10>=2&&count%10<=4?1:2];
+    q('[data-layout-summary]').textContent=world().name+' · '+scene().length+' '+plural(scene().length,['источник','источника','источников'])+' · '+phraseLength+' '+plural(phraseLength,['доля','доли','долей'])+' · '+bpm+' BPM';
+    document.title=layoutName?layoutName+' — Пейзаж':'Пейзаж — звуковой холст';
+  }
   function remember(){history.push(serial());if(history.length>20)history.shift();q('[data-action="undo"]').disabled=false;}
   function commit(){sound.cancelHeldSchedules();for(const event of phraseEvents)event.heldScheduled=false;sound.configure();sync();persist();}
   function anchorClock(){audioAnchor=(sound.context?.currentTime||0)-elapsed;wallAnchor=performance.now()/1000-elapsed;}
@@ -441,7 +480,7 @@
     const sourceSelect=q('[data-control="source"]');sourceSelect.replaceChildren(...scene().map(e=>{const option=document.createElement('option');option.value=e.id;option.textContent=typeFor(e.type).name+' '+e.id;return option;}));sourceSelect.disabled=!scene().length;sourceSelect.value=selectedId||'';q('[data-action="audition"]').disabled=!selected();drawToolIcon(q('[data-selected-icon]'),selected()?.type||tool);
     const e=selected();q('[data-editor-fields]').disabled=!e;q('[data-selection]').textContent=e?['Синт 1','Синт 2','Барабаны'][sourceChannel(e)]+' · '+(e.muted?'приглушён':typeFor(e.type).sustained?'непрерывно':'активен'):'Выбери предмет внизу';
     if(e){syncPitchEditor();q('[data-control="volume"]').value=Math.round(e.y*100);q('[data-value="volume"]').textContent=Math.round(e.y*100)+'%';q('[data-action="mute"]').textContent=e.muted?'Вернуть звук':'Приглушить';q('[data-action="mute"]').setAttribute('aria-pressed',String(e.muted));}
-    syncPattern();syncTimeline();q('[data-control="wave1"]').value=waveforms[worldKey][0];q('[data-control="wave2"]').value=waveforms[worldKey][1];syncParameters();resize();
+    syncPattern();syncTimeline();q('[data-control="wave1"]').value=waveforms[worldKey][0];q('[data-control="wave2"]').value=waveforms[worldKey][1];syncParameters();syncLayout();resize();
   }
   function resize(){
     const rect=stage.getBoundingClientRect();w=rect.width;h=rect.height;
@@ -573,7 +612,7 @@
   for(const key of ['pitch','volume']){const input=q('[data-control="'+key+'"]');input.addEventListener('pointerdown',()=>remember());input.addEventListener('keydown',()=>remember());input.addEventListener('input',()=>{const e=selected();if(!e)return;if(key==='pitch')e.x=scale().mode==='free'?Number(input.value)/(PITCH_SPAN*100):(allowedNotes()[Number(input.value)]-PITCH_MIN)/PITCH_SPAN;else e.y=Number(input.value)/100;commit();});}
   q('[data-action="mute"]').addEventListener('click',()=>{const e=selected();if(!e)return;remember();e.muted=!e.muted;if(e.muted){sound.stopSource(e.id);particles.filter(p=>p.id===e.id&&!p.done).forEach(p=>p.scheduled=false);}commit();});q('[data-action="duplicate"]').addEventListener('click',()=>{const e=selected();if(e)addSource(e.type,stepX(e.x,1),e.y,e);});q('[data-action="delete"]').addEventListener('click',removeSource);
   q('[data-action="clear"]').addEventListener('click',()=>{remember();scenes[worldKey]=[];particles=[];ripples=[];activatedHeld.clear();sound.stop();selectedId=null;commit();status('Сцена очищена. Отменить вернёт источники');});
-  q('[data-action="undo"]').addEventListener('click',()=>{const previous=history.pop();if(!previous)return;restore(previous);resetTransport();q('[data-action="undo"]').disabled=!history.length;commit();status('Последнее изменение отменено · фраза с начала');});
+  q('[data-action="undo"]').addEventListener('click',()=>{const previous=history.pop();if(!previous)return;restore(previous);resetTransport();q('[data-action="undo"]').disabled=!history.length;commit();const message='Последнее изменение отменено · фраза с начала';if(inspectorTab==='layouts')layoutStatus(message);else status(message);});
   q('[data-action="restart"]').addEventListener('click',()=>{resetTransport();sync();status('Фраза с первой доли');});
   q('[data-control="world"]').addEventListener('change',event=>setWorld(event.target.value));for(const action of ['previous-world','next-world'])q('[data-action="'+action+'"]').addEventListener('click',()=>setWorld(worldKey==='autumn'?'space':'autumn'));
   q('[data-control="tonic"]').addEventListener('change',event=>setScale('tonic',Number(event.target.value)));q('[data-control="mode"]').addEventListener('change',event=>setScale('mode',event.target.value));
@@ -592,9 +631,15 @@
     button.addEventListener('click', () => openInspector(button.dataset.inspectorTab));
     button.addEventListener('keydown', event => {
       if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
-      event.preventDefault(); const tab = ['Home','ArrowLeft'].includes(event.key) ? 'source' : 'sound'; openInspector(tab); q('[data-inspector-tab="'+tab+'"]').focus();
+      event.preventDefault();const tabs=['source','sound','layouts'],index=tabs.indexOf(inspectorTab);
+      const tab=event.key==='Home'?tabs[0]:event.key==='End'?tabs.at(-1):tabs[(index+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length];
+      openInspector(tab);q('[data-inspector-tab="'+tab+'"]').focus();
     });
   }
+  q('[data-action="export-layout"]').addEventListener('click',exportLayout);
+  q('[data-action="import-layout"]').addEventListener('click',()=>q('[data-control="layout-file"]').click());
+  q('[data-control="layout-file"]').addEventListener('change',event=>importLayout(event.target.files[0]));
+  q('[data-control="layout-name"]').addEventListener('input',event=>{layoutName=layoutFiles.normalizeName(event.target.value);persist();document.title=layoutName?layoutName+' — Пейзаж':'Пейзаж — звуковой холст';});
   for (const input of all('[data-source-param], [data-sound-param]')) {
     const sourceInput = !!input.dataset.sourceParam, key = input.dataset.sourceParam || input.dataset.soundParam;
     input.addEventListener('pointerdown', () => remember());
