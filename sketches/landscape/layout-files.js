@@ -3,9 +3,10 @@
   'use strict';
   const FORMAT = 'landscape-layout';
   const MAX_BYTES = 1024 * 1024;
-  const VERSIONS = [1, 2, 3, 4, 5];
+  const VERSIONS = [1, 2, 3, 4, 5, 6, 7];
   const TYPES = {autumn:['drop','leaf','raven','fog'],space:['comet','star','asteroid','aurora']};
   const WAVES = ['sine','triangle','sawtooth','square'];
+  const instruments = typeof module!=='undefined'&&module.exports ? require('./instruments.js') : window.LandscapeInstruments;
   const MODES = ['major','minor','dorian','phrygian','lydian','mixolydian','locrian','majorPent','minorPent','chromatic','free'];
   const SOURCE_RANGES = {gain:[0,1.5],pan:[-1,1],octave:[-2,2],detune:[-50,50],duration:[.08,2],attack:[.002,1],decay:[.02,1],sustain:[0,1],release:[.03,2],brightness:[300,12000]};
   const FX_RANGES = {brightness:[300,12000],drive:[0,1],delayMix:[0,.8],delayTime:[.04,1],feedback:[0,.75],reverbMix:[0,.8],room:[.4,4]};
@@ -19,10 +20,35 @@
   }
   function validateSnapshot(snapshot) {
     if(!record(snapshot)||!VERSIONS.includes(snapshot.version)||!Object.hasOwn(TYPES,snapshot.worldKey)||!record(snapshot.scenes))invalid();
+    if(snapshot.version===7) {
+      if(!Array.isArray(snapshot.layers)||snapshot.layers.length<1||snapshot.layers.length>4)invalid('В композиции должно быть от 1 до 4 слоёв.');
+      if(!number(snapshot.compositionTempo,45,160,true)||!number(snapshot.cycleBeats,1,128,true))invalid('Повреждены темп или длина оборота.');
+      const ids=new Set();
+      for(const layer of snapshot.layers){
+        if(!record(layer)||!number(layer.id,1,Number.MAX_SAFE_INTEGER-32,true)||ids.has(layer.id)||!['main','bass','melody','drums'].includes(layer.kind)||!number(layer.gain,0,1.5)||typeof layer.muted!=='boolean')invalid('Повреждены настройки слоя.');
+        ids.add(layer.id);
+        validateSnapshot({...snapshot,version:6,layers:undefined,fields:layer.fields,activeFieldId:layer.activeFieldId});
+      }
+      if(!ids.has(snapshot.selectedLayerId))invalid('Неизвестный выбранный слой.');
+    }
+    if(snapshot.version===6) {
+      if(!Array.isArray(snapshot.fields)||snapshot.fields.length<1||snapshot.fields.length>8)invalid('В композиции должно быть от 1 до 8 полей.');
+      const fieldIds=new Set();
+      for(const field of snapshot.fields) {
+        if(!record(field)||!number(field.id,1,Number.MAX_SAFE_INTEGER-32,true)||fieldIds.has(field.id))invalid('Повреждён список полей.');
+        fieldIds.add(field.id);
+        if(typeof field.name!=='string'||!field.name.trim()||field.name.length>80||normalizeName(field.name)!==field.name)invalid('Недопустимое название поля.');
+        if(!number(field.repeats,1,32,true))invalid('Число повторов поля должно быть от 1 до 32.');
+        if(!record(field.snapshot)||field.snapshot.version!==5||'fields' in field.snapshot)invalid('Повреждено содержимое поля.');
+        validateSnapshot(field.snapshot);
+      }
+      if(!fieldIds.has(snapshot.activeFieldId)||typeof snapshot.sequenceEnabled!=='boolean')invalid('Повреждены настройки порядка полей.');
+    }
     if(!number(snapshot.bpm,45,160,true))invalid('Темп в раскладке должен быть от 45 до 160 BPM.');
     if(snapshot.version>=3&&!number(snapshot.phraseLength,1,32,true))invalid('Длина фразы должна быть от 1 до 32 долей.');
     if('nextId' in snapshot&&!number(snapshot.nextId,1,Number.MAX_SAFE_INTEGER-32,true))invalid('Повреждён счётчик источников.');
     if('selectedId' in snapshot&&snapshot.selectedId!==null&&!number(snapshot.selectedId,1,Number.MAX_SAFE_INTEGER-32,true))invalid('Повреждён выбор источника.');
+    if('toolInstrument' in snapshot&&snapshot.toolInstrument!=='default'&&!instruments.get(snapshot.toolInstrument))invalid('Неизвестный инструмент палитры.');
     const ids=new Set();
     for(const [world,types] of Object.entries(TYPES)) {
       const sources=snapshot.scenes[world];
@@ -35,6 +61,10 @@
         if(source.sound!==undefined) {
           ranges(source.sound,SOURCE_RANGES);
           if('channel' in source.sound&&!['auto','0','1','2'].includes(source.sound.channel))invalid('Неизвестный звуковой канал.');
+          if('instrument' in source.sound&&source.sound.instrument!=='default'&&!instruments.get(source.sound.instrument))invalid('Неизвестный инструмент.');
+          if('wave' in source.sound&&!['auto',...WAVES].includes(source.sound.wave))invalid('Неизвестная форма волны источника.');
+          const preset=instruments.get(source.sound.instrument);
+          if(preset&&instruments.typeFor(preset,world)!==source.type)invalid('Инструмент не соответствует предмету.');
         }
       }
       const scale=snapshot.scaleSettings?.[world];

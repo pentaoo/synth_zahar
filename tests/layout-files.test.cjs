@@ -45,3 +45,33 @@ test('large files are rejected and filenames cannot include directory separators
  assert.equal(files.filename(''),'Пейзаж.landscape.json');
  assert.equal(files.normalizeName('  Осень\n  '),'Осень');
 });
+test('composition files preserve every independent field, live order, repeat counts and active field',()=>{
+ const first=snapshot(),second=snapshot();second.worldKey='space';second.bpm=127;second.phraseLength=17;second.scenes.autumn[0].steps=[2,8,16];second.scenes.space[0].y=.457893;
+ const state={...first,version:6,activeFieldId:2,sequenceEnabled:true,fields:[{id:2,name:'Припев',repeats:4,snapshot:second},{id:1,name:'Вступление',repeats:2,snapshot:first}]};
+ const decoded=files.decode(files.encode(state,'Длинная композиция')).snapshot;
+ assert.deepEqual(decoded,state);
+ decoded.fields[0].snapshot.scenes.space[0].y=.1;assert.equal(second.scenes.space[0].y,.457893);
+});
+test('invalid field contents or progression settings reject the entire composition',()=>{
+ const state={...snapshot(),version:6,activeFieldId:1,sequenceEnabled:true,fields:[{id:1,name:'Фраза 1',repeats:2,snapshot:snapshot()}]};
+ const mutations=[s=>s.fields=[],s=>s.fields.push(s.fields[0]),s=>s.activeFieldId=9,s=>s.sequenceEnabled='yes',s=>s.fields[0].repeats=0,s=>s.fields[0].repeats=33,s=>s.fields[0].repeats=1.5,s=>s.fields[0].name='',s=>s.fields[0].snapshot.scenes.space[0].steps=[99],s=>s.fields[0].snapshot.version=6];
+ const before=JSON.stringify(state);
+ for(const mutate of mutations){const candidate=JSON.parse(before);mutate(candidate);assert.throws(()=>files.decode(JSON.stringify(candidate)));}
+ assert.equal(JSON.stringify(state),before);
+});
+function layeredSnapshot(){
+ const base=snapshot(),fields=[{id:1,name:'Фраза 1',repeats:2,snapshot:base}];
+ return {...base,version:7,fields,activeFieldId:1,sequenceEnabled:true,compositionTempo:96,cycleBeats:32,selectedLayerId:2,layers:[
+  {id:1,kind:'main',gain:.7,muted:false,fields,activeFieldId:1},
+  {id:2,kind:'bass',gain:.42,muted:true,fields:[...fields,{id:2,name:'Фраза 2',repeats:1,snapshot:snapshot()}],activeFieldId:2}
+ ]};
+}
+test('layered files preserve independent phrase counts, selection, gain, mute and common clock',()=>{
+ const original=layeredSnapshot();assert.deepEqual(files.decode(files.encode(original,'Кольца')).snapshot,original);
+});
+test('a malformed inactive layer rejects the complete file without mutating the original',()=>{
+ const state=layeredSnapshot(),before=JSON.stringify(state);
+ const mutations=[s=>s.layers=[],s=>s.layers[0].id=2,s=>s.layers[0].gain=2,s=>s.layers[0].muted='yes',s=>s.layers[0].fields[0].snapshot.scenes.autumn[0].x=9,s=>s.layers[0].fields[0].repeats=0,s=>s.layers[1].activeFieldId=99,s=>s.layers[1].kind='unknown',s=>s.selectedLayerId=7,s=>s.compositionTempo=300,s=>s.cycleBeats=0];
+ for(const mutate of mutations){const candidate=JSON.parse(before);mutate(candidate);assert.throws(()=>files.decode(JSON.stringify(candidate)));}
+ assert.equal(JSON.stringify(state),before);
+});
