@@ -1,4 +1,4 @@
-/* A complete, repeatable performance score. Two synth voices and three drums. */
+/* Eight related phrases, authored as independent melody, bass and drum parts. */
 (() => {
  'use strict';
  const copy=value=>JSON.parse(JSON.stringify(value));
@@ -20,7 +20,7 @@
    {wave:'triangle',noise:0,brightness:4800,fm:.12,harmonicity:2.76,detune:5,motion:.08,lfoRate:.8,attack:.01,release:.25}
   ],drums:{kick:1,snare:1,hat:1,gain:.8,tone:.7,decay:.18,noise:.3,brightness:10000,drive:.06,echo:.035,space:.045},drive:.1,echo:.16,space:.2,swing:.06,master:.36
  };
- function fields(base){
+ function fields(base,kind='melody'){
   return phrases.map((phrase,index)=>{
    const snapshot=copy(base),sources=[];
    const source=(role,note,steps,y,sound={})=>{
@@ -29,30 +29,27 @@
     const instrument=role==='drum'?sound.instrument:channel===0?'wave-sine':'wave-triangle';
     sources.push({id:sources.length+1,type,x:(note-48)/24,y,steps:[...steps],muted:false,sound:{gain:1,pan:0,octave:role==='bass'?-1:0,detune:0,duration:.12,attack:.006,decay:.14,sustain:.35,release:.22,brightness:5000,channel:String(channel),instrument,wave:role==='drum'?'auto':channel===0?'sine':'triangle',noise:role==='drum'?1:0,...sound}});
    };
-   // The bass anchors downbeats; the fifth answers in the gaps of the lead.
-   source('bass',phrase.root,index===0||index===7?[0,4]:[0,3,4,6],.48*phrase.energy,{duration:.1,decay:.16,sustain:.55,release:.12,brightness:1800});
-   source('bass',phrase.fifth,index===7?[6]:[2,7],.37*phrase.energy,{duration:.09,release:.1,brightness:1500});
-   // Grouping by pitch preserves a small set of editable sources rather than a piano roll.
-   const melody=new Map();phrase.lead.forEach((note,step)=>{if(note!==null){if(!melody.has(note))melody.set(note,[]);melody.get(note).push(step);}});
-   for(const [note,steps] of melody)source('lead',note,steps,.47*phrase.energy,{duration:.13,decay:.15,sustain:.4,release:.24,pan:.08});
-   // A quiet chord connects the bass and hook without hiding the percussion.
-   phrase.pad.forEach((note,i)=>source('pad',note,all,Math.max(.08,.12*phrase.energy),{attack:.22,decay:.3,sustain:.48,release:.55,brightness:2200,gain:.6,pan:(i-1)*.22}));
-   const sparse=index===0||index===7;
-   source('drum',48,sparse?[0,4]:index===5||index===6?[0,3,4,6]:[0,4],.4*phrase.energy,{instrument:'kick-deep',duration:.26,attack:.002,release:.03});
-   source('drum',48,sparse?[6]:[2,6],.28*phrase.energy,{instrument:'snare-dry',duration:.13,attack:.002,release:.03,pan:-.04});
-   source('drum',48,sparse?[0,2,4,6]:all,.17*phrase.energy,{instrument:'hat-closed',duration:.08,attack:.002,release:.03,pan:.15});
-   snapshot.worldKey='autumn';snapshot.bpm=96;snapshot.phraseLength=8;snapshot.scenes={autumn:sources,space:[]};snapshot.nextId=sources.length+1;snapshot.selectedId=sources[2]?.id||1;snapshot.tool='leaf';snapshot.toolInstrument='wave-triangle';snapshot.scaleSettings.autumn={tonic:2,mode:'minor'};snapshot.waveforms.autumn=['sine','triangle'];
+   if(kind==='bass'){
+    // The bass anchors downbeats; the fifth answers in the gaps of the lead.
+    source('bass',phrase.root,index===0||index===7?[0,4]:[0,3,4,6],.48*phrase.energy,{duration:.1,decay:.16,sustain:.55,release:.12,brightness:1800});
+    source('bass',phrase.fifth,index===7?[6]:[2,7],.37*phrase.energy,{duration:.09,release:.1,brightness:1500});
+   }else if(kind==='drums'){
+    const sparse=index===0||index===7;
+    source('drum',48,sparse?[0,4]:index===5||index===6?[0,3,4,6]:[0,4],.4*phrase.energy,{instrument:'kick-deep',duration:.26,attack:.002,release:.03});
+    source('drum',48,sparse?[6]:[2,6],.28*phrase.energy,{instrument:'snare-dry',duration:.13,attack:.002,release:.03,pan:-.04});
+    source('drum',48,sparse?[0,2,4,6]:all,.17*phrase.energy,{instrument:'hat-closed',duration:.08,attack:.002,release:.03,pan:.15});
+   }else{
+    // Grouping by pitch preserves the lead and its rests without accompaniment.
+    const melody=new Map();phrase.lead.forEach((note,step)=>{if(note!==null){if(!melody.has(note))melody.set(note,[]);melody.get(note).push(step);}});
+    for(const [note,steps] of melody)source('lead',note,steps,.47*phrase.energy,{duration:.13,decay:.15,sustain:.4,release:.24,pan:.08});
+   }
+   snapshot.worldKey='autumn';snapshot.bpm=96;snapshot.phraseLength=8;snapshot.scenes={autumn:sources,space:[]};snapshot.nextId=sources.length+1;snapshot.selectedId=sources[0]?.id||null;snapshot.tool=sources[0]?.type||'leaf';snapshot.toolInstrument=sources[0]?.sound.instrument||'wave-triangle';snapshot.scaleSettings.autumn={tonic:2,mode:'minor'};snapshot.waveforms.autumn=['sine','triangle'];
    const fx=snapshot.soundSettings.autumn;fx.effects.synth={...fx.effects.synth,brightness:11000,drive:.1,delayMix:.16,delayTime:.3125,feedback:.28,reverbMix:.2,room:2.2};fx.effects.drum={...fx.effects.drum,brightness:10000,drive:.06,delayMix:.035,delayTime:.15625,feedback:.1,reverbMix:.045,room:.9};
    return {id:index+1,name:phrase.name,repeats:1,snapshot};
   });
  }
  function partFields(base,kind){
-  const channel={bass:'0',melody:'1',drums:'2'}[kind];
-  return fields(base).map(field=>{
-   if(channel!==undefined)field.snapshot.scenes.autumn=field.snapshot.scenes.autumn.filter(source=>source.sound.channel===channel);
-   const source=field.snapshot.scenes.autumn[0];field.snapshot.selectedId=source?.id||null;field.snapshot.tool=source?.type||'leaf';field.snapshot.toolInstrument=source?.sound.instrument||'wave-triangle';
-   return field;
-  });
+  return fields(base,kind);
  }
  const api={phrases,fields,partFields,patchDefaults};
  if(typeof module!=='undefined'&&module.exports)module.exports=api;else window.PerformanceScore=api;

@@ -6,7 +6,7 @@
   const panel=root.querySelector('[data-live-editor]'),canvas=panel.querySelector('canvas'),context=canvas.getContext('2d'),overlay=panel.querySelector('[data-live-sources]');
   const select=panel.querySelector('[data-live-source]'),brush=panel.querySelector('[data-live-brush]'),beats=panel.querySelector('[data-live-beats]');
   const buttons=new Map(),histories=new Map();let selectedId=null,key=null,gesture=null,geom={left:26,right:600,top:26,bottom:180};
-  const library=window.PhrasePresets,presetList=panel.querySelector('[data-phrase-presets]');
+  const library=window.PhrasePresets,parts=window.CompositionTools,presetList=panel.querySelector('[data-phrase-presets]');
   let presetGroup='melody',append=false,presetIndex=0,presetSignature='',variation=0;
   const showInsertion=result=>message(result?.ok?'Вставлена новая фраза «'+result.name+'»':result?.message||'Не удалось вставить фразу');
   const patternDrag=window.PatternDrag.mount(root,{target:api.dropTarget,preview:api.previewInsertion,insert(fragment,target){showInsertion(api.insertPhrase(fragment,target));}});
@@ -17,6 +17,7 @@
   function message(text){panel.querySelector('[data-live-status]').textContent=text;}
   function applyPreset(index){
    const model=api.get();if(!model)return;
+   if(!parts.partGroups(model.kind).includes(presetGroup))return;
    try{
     const result=library.insert(model.snapshot,{group:presetGroup,preset:index,append,notes:api.notes(model.snapshot)},api.create);
     presetIndex=index;variation=0;change(snapshot=>{snapshot.scenes.autumn=result.scenes.autumn;snapshot.nextId=result.nextId;snapshot.selectedId=result.selectedId;selectedId=result.selectedId;});
@@ -28,7 +29,8 @@
    try{const result=library.transform(model.snapshot,{group:presetGroup,action,variation:++variation,notes:api.notes(model.snapshot)});change(snapshot=>{snapshot.scenes.autumn=result.scenes.autumn;});message({variation:'Новая вариация',shift:'Ритм сдвинут на долю',sparse:'Больше пауз',dense:'Больше движения'}[action]);}catch(error){message(error.message);}
   }
   function renderPresets(model){
-   for(const button of panel.querySelectorAll('[data-preset-group]'))button.setAttribute('aria-pressed',String(button.dataset.presetGroup===presetGroup));
+   const groups=parts.partGroups(model.kind);if(!groups.includes(presetGroup))presetGroup=groups[0];
+   for(const button of panel.querySelectorAll('[data-preset-group]')){button.hidden=!groups.includes(button.dataset.presetGroup);button.disabled=button.hidden;button.setAttribute('aria-pressed',String(button.dataset.presetGroup===presetGroup));}
    for(const button of panel.querySelectorAll('[data-preset-mode]'))button.setAttribute('aria-pressed',String((button.dataset.presetMode==='append')===append));
    if(presetSignature!==presetGroup){
     presetSignature=presetGroup;presetList.replaceChildren(...library.groups[presetGroup].presets.map((preset,index)=>{
@@ -42,6 +44,7 @@
   }
   function add(x=.5,y=.5){
    const model=api.get();if(!model)return;if(model.snapshot.scenes.autumn.length>=16){message('В этой фразе уже 16 источников');return;}
+   if(!parts.acceptsBrush(model.kind,brush.value))return;
    change(snapshot=>{const source=api.create(brush.value,snapshot,x,y);snapshot.scenes.autumn.push(source);selectedId=source.id;snapshot.selectedId=source.id;});api.selectSource(selectedId);
   }
   function remove(){if(!api.get()||!selected(api.get()))return;change(snapshot=>{snapshot.scenes.autumn=snapshot.scenes.autumn.filter(source=>source.id!==selectedId);selectedId=snapshot.scenes.autumn[0]?.id||null;});}
@@ -83,6 +86,8 @@
   }
   function render(){
    const model=api.get();panel.hidden=!model;root.classList.toggle('is-phrase-editor-open',!!model);if(!model)return;
+   for(const option of brush.options){option.hidden=!parts.acceptsBrush(model.kind,option.value);option.disabled=option.hidden;}
+   if(!parts.acceptsBrush(model.kind,brush.value))brush.value=[...brush.options].find(option=>!option.disabled).value;
    if(key!==model.key){
     key=model.key;const first=model.snapshot.scenes.autumn.find(source=>source.id===model.snapshot.selectedId)||model.snapshot.scenes.autumn.find(source=>api.channel(source)===1&&source.type!=='fog')||model.snapshot.scenes.autumn[0];
     selectedId=first?.id||null;gesture=null;presetGroup=first?Object.keys(library.groups).find(group=>library.belongs(first,group))||'melody':model.kind==='bass'?'bass':model.kind==='drums'?'drums':'melody';presetIndex=0;variation=0;message('');api.selectSource(selectedId);

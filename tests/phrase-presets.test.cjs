@@ -22,7 +22,8 @@ test('append preserves existing nodes, allocates unique IDs and rejects a full p
  const {base,create}=await setup(),notes=notesFor([0,2,3,5,7,8,10],2);
  const added=presets.insert(base,{group:'chords',preset:1,append:true,notes},create);
  assert.deepEqual(added.scenes.autumn.slice(0,base.scenes.autumn.length),base.scenes.autumn);assert.equal(new Set(added.scenes.autumn.map(source=>source.id)).size,added.scenes.autumn.length);
- const before=JSON.stringify(added);assert.throws(()=>presets.insert(added,{group:'chords',preset:1,append:true,notes},create),/16 нод/);assert.equal(JSON.stringify(added),before);
+ let full=added;while(full.scenes.autumn.length<=12)full=presets.insert(full,{group:'chords',preset:1,append:true,notes},create);
+ const before=JSON.stringify(full);assert.throws(()=>presets.insert(full,{group:'chords',preset:1,append:true,notes},create),/16 нод/);assert.equal(JSON.stringify(full),before);
 });
 test('variations and rhythm transformations retain source identities and valid tuning through repeated edits',async()=>{
  const {base,create}=await setup(),notes=notesFor([0,2,3,5,7,8,10],2);

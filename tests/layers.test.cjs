@@ -24,6 +24,7 @@ async function layered(performanceMode=false) {
   between('  function anchorClock(){','  function addSource(')+
   between('  function generatePhraseBeats() {','  canvas.addEventListener(')+
   between('  function liveEditorModel() {','  function syncPerformance() {')+
+  between('  function changeInstrument(id) {','  function syncPerformanceSources() {')+
   between('  function pause(){','  q(\'[data-action="play"]\').addEventListener')+`
     const starterSnapshot=fieldSnapshot();
     phraseLength=2;bpm=160;scenes.space=[];
@@ -37,7 +38,7 @@ async function layered(performanceMode=false) {
       advance(time){audioHost.context.advance(time);frame(time*1000);},
       state:()=>{storeCurrentLayer();return {tempo:compositionTempo,scope:editorView,running,selectedLayerId,layers:layers.map(layer=>({id:layer.id,active:layer.context.activeFieldId,queued:layer.context.queuedFieldId,beat:layer.context.beat,elapsed:layer.context.elapsed,fields:clone(layer.fields)})),hits:clone(stats.hits)};},
       engines:()=>layers.map(layer=>layer.engine),choose:chooseField,select:selectLayer,tempo:setCompositionTempo,scope:setEditorView,pause,serial,remove:removeLayer,add:addLayer,addField,reorder:reorderField,
-      inspect(id,layerId){liveEditorOpen=true;inspectField(id,layerId);},model:liveEditorModel,edit:updateLivePhrase,insertPattern:insertPatternPhrase,
+      inspect(id,layerId){liveEditorOpen=true;inspectField(id,layerId);},model:liveEditorModel,edit:updateLivePhrase,insertPattern:insertPatternPhrase,timbre:changeInstrument,sourceParam:setSourceParameter,
       preset(group,preset=0,append=false){const model=liveEditorModel(),result=phrasePresets.insert(model.snapshot,{group,preset,append,notes:notesForSnapshot(model.snapshot)},createLiveSource);updateLivePhrase(snapshot=>{snapshot.scenes.autumn=result.scenes.autumn;snapshot.nextId=result.nextId;snapshot.selectedId=result.selectedId;});},
       patch:()=>typeof performancePatch==='undefined'?null:clone(performancePatch),
       setPatch(value){performancePatch=clone(value);},loadScore:loadPerformanceScore,restart:restartPerformance,
@@ -194,11 +195,54 @@ test('each fresh start loads the authored score instead of the saved edited comp
  const edited=c.serial();await c.reload();assert.equal(c.state().layers.length,3);
  c.loadScore();const fresh=c.serial();
  assert.equal(c.state().running,false);assert.equal(fresh.layers.length,1);assert.equal(fresh.compositionTempo,96);assert.equal(fresh.cycleBeats,64);
+ assert.equal(fresh.layers[0].kind,'melody');assert.ok(fresh.fields.every(field=>field.snapshot.scenes.autumn.every(source=>source.sound.channel==='1'&&source.type==='leaf')));
  assert.equal(fresh.sequenceEnabled,true);assert.equal(fresh.activeFieldId,1);
  assert.deepEqual(Array.from(fresh.fields,field=>field.name),require('../sketches/landscape/performance-score.js').phrases.map(phrase=>phrase.name));
  assert.deepEqual(JSON.parse(JSON.stringify(c.patch())),require('../sketches/landscape/performance-score.js').patchDefaults);
  assert.equal(fresh.fields[0].snapshot.scaleSettings.autumn.tonic,2);assert.equal(fresh.fields[0].snapshot.scaleSettings.autumn.mode,'minor');
  assert.notDeepEqual(JSON.parse(JSON.stringify(fresh.fields[0].snapshot.scenes)),JSON.parse(JSON.stringify(edited.fields[0].snapshot.scenes)));
+});
+
+test('melody starts alone, adding bass and drums preserves it, and each part routes only its own sounds',async()=>{
+ const c=await layered(true);c.loadScore();await c.init();c.resume();c.tickTo(.91);
+ const melody=JSON.parse(JSON.stringify(c.serial().layers[0].fields));
+ assert.ok(c.engines()[0].voices.size);assert.ok([...c.engines()[0].voices.values()].every(voice=>voice.channel===1));
+ await c.add('bass');assert.equal(c.patch().selectedVoice,0);
+ await c.add('drums');assert.equal(c.patch().selectedVoice,2);
+ assert.deepEqual(JSON.parse(JSON.stringify(c.serial().layers[0].fields)),melody);
+ const channels=c.engines().map(()=>new Set());
+ for(let time=.92;time<=3;time+=.01){c.advance(time);c.engines().forEach((engine,index)=>{for(const voice of engine.voices.values())channels[index].add(voice.channel);});}
+ for(const [index,channel] of [1,0,2].entries()){
+  const layer=c.serial().layers[index];
+  assert.ok(layer.fields.every(field=>field.snapshot.scenes.autumn.every(source=>source.sound.channel===String(channel))));
+  assert.deepEqual([...channels[index]],[channel],layer.kind+' emits only its own channel');
+ }
+ c.inspect(1,2);const before=c.state().layers[0].elapsed;
+ c.timbre('wave-square');c.sourceParam('channel','2');
+ assert.ok(c.model().snapshot.scenes.autumn.every(source=>source.sound.channel==='0'&&source.sound.octave===-1&&source.sound.instrument==='wave-square'));
+ c.timbre('kick-deep');assert.ok(c.model().snapshot.scenes.autumn.every(source=>source.sound.instrument==='wave-square'));
+ close(c.state().layers[0].elapsed,before);assert.equal(c.state().running,true);
+ assert.deepEqual(JSON.parse(JSON.stringify(c.serial().layers[0].fields)),melody);
+ c.inspect(1,1);assert.equal(c.patch().selectedVoice,1);c.preset('melody',1);
+ assert.ok(c.model().snapshot.scenes.autumn.every(source=>source.sound.channel==='1'));
+ c.inspect(1,3);c.preset('drums',2);assert.ok(c.model().snapshot.scenes.autumn.every(source=>source.sound.channel==='2'));
+ const saved=JSON.stringify(c.serial()),result=c.insertPattern({group:'drums',preset:0},{layerId:1,index:1});
+ assert.equal(result.ok,false);assert.equal(JSON.stringify(c.serial()),saved);
+ require('../sketches/landscape/layout-files.js').validateSnapshot(c.serial());
+});
+
+test('adding accompaniment midway through the score picks up the melody harmony and future beat boundaries',async()=>{
+ const c=await layered(true);c.loadScore();await c.init();c.resume();c.tickTo(7.4);
+ const before=c.state().layers[0];assert.equal(before.active,2);
+ await c.add('bass');await c.add('drums');
+ for(const layer of c.state().layers){assert.equal(layer.active,before.active);close(layer.beat,before.beat);close(layer.elapsed,before.elapsed);}
+ c.tickTo(8.51);
+ const hits=c.state().hits.filter(hit=>hit.audioAt>7.4);
+ const melody=hits.find(hit=>hit.layerId===1&&hit.step===4),bass=hits.find(hit=>hit.layerId===2&&hit.step===4),kick=hits.find(hit=>hit.layerId===3&&hit.step===4);
+ assert.ok(melody&&bass&&kick);close(melody.audioAt,bass.audioAt);close(melody.audioAt,kick.audioAt);
+ assert.equal(bass.fieldId,2);assert.equal(kick.fieldId,2);
+ assert.ok(hits.filter(hit=>hit.layerId!==1).every(hit=>hit.audioAt>7.4),'new parties never replay past beats');
+ c.tickTo(10.81);for(const layer of c.state().layers)assert.equal(layer.active,3);
 });
 test('restart restores the score during playback and reuses the audio output',async()=>{
  const c=await layered(true);c.loadScore();await c.init();c.resume();c.tickTo(.91);

@@ -2,16 +2,18 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const score=require('../sketches/landscape/performance-score.js'),files=require('../sketches/landscape/layout-files.js');
 const {fixture}=require('./helpers/audio-fixture.cjs');
-test('the authored track has eight valid, distinct phrases with bass, melody, chords and drums',async()=>{
+test('the opening track is only the authored melody, with all eight phrases and their rests',async()=>{
  const f=await fixture([]),base=f.serial(),before=JSON.stringify(base),fields=score.fields(base);
  assert.equal(fields.length,8);assert.equal(JSON.stringify(base),before);
  for(const field of fields){
   files.validateSnapshot(field.snapshot);const sources=field.snapshot.scenes.autumn;
   assert.ok(sources.length<=16);assert.equal(field.snapshot.phraseLength,8);
   assert.deepEqual(field.snapshot.scaleSettings.autumn,{tonic:2,mode:'minor'});
-  assert.ok(sources.some(s=>s.sound.channel==='0'&&s.sound.octave===-1));
-  assert.equal(sources.filter(s=>s.type==='fog').length,3);
-  assert.equal(sources.filter(s=>s.type==='raven').length,3);
+  assert.ok(sources.every(s=>s.sound.channel==='1'&&s.type==='leaf'&&s.sound.octave===0));
+  for(let step=0;step<8;step++){
+   const notes=sources.filter(source=>source.steps.includes(step)).map(source=>48+source.x*24);
+   assert.deepEqual(notes,score.phrases[field.id-1].lead[step]===null?[]:[score.phrases[field.id-1].lead[step]]);
+  }
   assert.ok(sources.every(s=>[0,2,3,5,7,8,10].includes(((48+s.x*24-2)%12+12)%12)));
  }
  assert.equal(new Set(fields.map(f=>JSON.stringify(f.snapshot.scenes.autumn))).size,8);

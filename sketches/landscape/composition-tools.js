@@ -73,6 +73,16 @@
     return Array.from({length:count},(_,index)=>({id:index+1,name:'Фраза '+(index+1),repeats:1,snapshot:demoSnapshot(base,index+offset)}));
   }
   const PART_NAMES={main:'Основная',bass:'Бас',melody:'Мелодия',drums:'Барабаны'};
+  const partChannel=kind=>({bass:0,melody:1,drums:2})[kind];
+  const partGroups=kind=>kind==='bass'?['bass']:kind==='melody'?['melody','chords']:kind==='drums'?['drums']:['melody','chords','bass','drums'];
+  function acceptsInstrument(kind,id){
+    const channel=partChannel(kind),preset=instruments.get(id);
+    return channel===undefined||id==='default'||!!preset&&(channel===2?preset.category==='drums':preset.category==='waves');
+  }
+  function acceptsBrush(kind,brush){
+    const channel=partChannel(kind);
+    return channel===undefined||channel===0&&brush==='0'||channel===1&&['1','held'].includes(brush)||channel===2&&instruments.get(brush)?.category==='drums';
+  }
   function ringRadii(count,index) {
     if(count===1)return {outer:462,inner:208};
     const thickness=(462-84-(count-1)*20)/count,outer=462-index*(thickness+20);
@@ -112,6 +122,6 @@
     result.worldKey='autumn';result.tool=types[result.tool]||'drop';
     return result;
   }
-  const api={sectorGeometry,sectorPath,addButtonRadius,slotAtPoint,insertionAtPoint,reordered,demoSnapshot,demoFields,defaultTheme,PART_NAMES,ringRadii,layerBeatRate,partFields};
+  const api={sectorGeometry,sectorPath,addButtonRadius,slotAtPoint,insertionAtPoint,reordered,demoSnapshot,demoFields,defaultTheme,PART_NAMES,partChannel,partGroups,acceptsInstrument,acceptsBrush,ringRadii,layerBeatRate,partFields};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else window.CompositionTools=api;
 })();
