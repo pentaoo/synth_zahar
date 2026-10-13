@@ -4,11 +4,12 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f4f5ee"><meta name="description" content="Пейзаж — музыкальный инструмент. Собери повторяющуюся фразу из предметов на холсте.">
 <title>Пейзаж — звуковой холст</title>
-<link rel="stylesheet" href="./sketches/landscape/landscape.css?v=20261013-readable-wave"><script src="./sketches/landscape/instruments.js?v=20261013-readable-wave" defer></script><script src="./sketches/landscape/layout-files.js?v=20261013-readable-wave" defer></script><script src="./sketches/landscape/composition-tools.js?v=20261013-readable-wave" defer></script><script src="./sketches/landscape/selection-tools.js?v=20261013-readable-wave" defer></script>
-<script src="./sketches/landscape/performance-score.js?v=20261013-readable-wave" defer></script><script src="./sketches/landscape/knobs.js?v=20261013-readable-wave" defer></script><script src="./sketches/landscape/performance-controls.js?v=20261013-readable-wave" defer></script>
-<script src="./sketches/landscape/output-scope.js?v=20261013-readable-wave" defer></script>
-<script src="./sketches/landscape/live-phrase-editor.js?v=20261013-readable-wave" defer></script>
-<script src="./sketches/landscape/landscape.js?v=20261013-readable-wave" defer></script>
+<link rel="stylesheet" href="./sketches/landscape/landscape.css?v=20261013-live-parts"><script src="./sketches/landscape/instruments.js?v=20261013-live-parts" defer></script><script src="./sketches/landscape/layout-files.js?v=20261013-live-parts" defer></script><script src="./sketches/landscape/composition-tools.js?v=20261013-live-parts" defer></script><script src="./sketches/landscape/selection-tools.js?v=20261013-live-parts" defer></script>
+<script src="./sketches/landscape/performance-score.js?v=20261013-live-parts" defer></script><script src="./sketches/landscape/knobs.js?v=20261013-live-parts" defer></script><script src="./sketches/landscape/performance-controls.js?v=20261013-live-parts" defer></script>
+<script src="./sketches/landscape/output-scope.js?v=20261013-live-parts" defer></script>
+<script src="./sketches/landscape/phrase-presets.js?v=20261013-live-parts" defer></script><script src="./sketches/landscape/pattern-drag.js?v=20261013-live-parts" defer></script>
+<script src="./sketches/landscape/live-phrase-editor.js?v=20261013-live-parts" defer></script>
+<script src="./sketches/landscape/landscape.js?v=20261013-live-parts" defer></script>
 </head>
 <body>
 <main id="landscape-lab-01" class="landscape-lab performance-mode" data-world="autumn">
@@ -61,7 +62,8 @@
   <aside class="ll-editor" aria-label="Синтез звука">
    <div class="performance-panel" data-performance-panel>
     <div class="performance-panel-title">СИНТЕЗ ЗВУКА</div>
-    <div class="performance-voices" role="group" aria-label="Синтезаторный голос"><button type="button" data-performance-voice="0" aria-pressed="false">Синт 1 <span>Бас</span></button><button type="button" data-performance-voice="1" aria-pressed="true">Синт 2 <span>Мелодия</span></button></div>
+    <div class="performance-voices" role="group" aria-label="Партия для настройки"><button type="button" data-performance-voice="0" aria-pressed="false">Бас <span>Синт 1</span></button><button type="button" data-performance-voice="1" aria-pressed="true">Мелодия <span>Синт 2</span></button><button type="button" data-performance-voice="2" aria-pressed="false">Барабаны <span>Ритм</span></button></div>
+    <div class="timbre-presets" data-timbre-presets role="group" aria-label="Быстрые тембры выбранной партии"></div>
     <div class="knob-grid" data-voice-knobs></div>
     <div class="performance-panel-title performance-fx-title">ОБЩЕЕ ЗВУЧАНИЕ</div>
     <div class="knob-grid effect-knobs" data-effect-knobs></div>
@@ -109,6 +111,11 @@
     <div class="performance-playback-caption"><span class="performance-now-label">Сейчас</span><strong data-current-phrase>Зерно</strong><span data-next-phrase>Далее: Ответ</span></div>
     <section class="live-phrase-editor" data-live-editor hidden aria-label="Редактирование фразы во время исполнения">
      <div class="live-editor-header"><div><span class="live-editor-caption">Редактирование фразы</span><strong data-live-title>Зерно</strong><small data-live-context></small></div><button type="button" data-live-cue title="Играть эту фразу следующей">▷ Следующей</button><button type="button" class="live-close" data-live-close aria-label="Закрыть редактор фразы">×</button></div>
+     <div class="live-preset-library" aria-label="Музыкальные заготовки">
+      <div class="preset-library-top"><div class="preset-groups" role="group" aria-label="Партия заготовки"><button type="button" data-preset-group="melody" aria-pressed="true">Мелодия</button><button type="button" data-preset-group="chords" aria-pressed="false">Аккорды</button><button type="button" data-preset-group="bass" aria-pressed="false">Бас</button><button type="button" data-preset-group="drums" aria-pressed="false">Ритм</button></div><span class="preset-drag-hint">Клик — вставить. Перетащи между фразами ↗</span></div>
+      <div class="phrase-preset-list" data-phrase-presets role="group" aria-label="Готовые музыкальные партии"></div>
+      <div class="preset-library-bottom"><div class="preset-modes" role="group" aria-label="Способ вставки нот"><button type="button" data-preset-mode="replace" aria-pressed="true">Заменить</button><button type="button" data-preset-mode="append" aria-pressed="false">Дополнить</button></div><div class="pattern-transforms" role="group" aria-label="Развитие партии"><button type="button" data-pattern-transform="variation" aria-keyshortcuts="V" title="Изменить мотив · V">Вариация <kbd>V</kbd></button><button type="button" data-pattern-transform="shift">Сдвиг</button><button type="button" data-pattern-transform="sparse">Реже</button><button type="button" data-pattern-transform="dense">Плотнее</button></div><button type="button" data-preset-new-phrase title="Вставить выбранную заготовку новой фразой после открытой">+ Фраза</button></div>
+     </div>
      <div class="live-editor-tools"><select data-live-source aria-label="Источник в открытой фразе"></select><select data-live-brush aria-label="Добавляемый источник"><option value="1">Синт 2</option><option value="0">Синт 1</option><option value="held">Фон · Синт 2</option><option value="kick-deep">Бочка</option><option value="snare-dry">Снейр</option><option value="hat-closed">Хэт</option></select><button type="button" data-live-add aria-label="Добавить источник в открытую фразу">+</button><button type="button" data-live-copy aria-label="Копировать выбранный источник">⧉</button><button type="button" data-live-delete aria-label="Удалить выбранный источник">×</button><button type="button" data-live-undo aria-label="Отменить правку фразы">↶</button></div>
      <div class="live-editor-stage"><canvas data-live-canvas tabindex="0" role="img" aria-label="Ноды выбранной фразы: X меняет ноту, Y — громкость. Клик по свободному месту добавляет источник."></canvas><div data-live-sources class="live-editor-sources"></div></div>
      <div class="live-editor-rhythm"><span>Доли</span><div data-live-beats role="group" aria-label="Ритм выбранного источника"></div><span data-live-status role="status"></span></div>

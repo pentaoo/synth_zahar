@@ -6,11 +6,40 @@
   const panel=root.querySelector('[data-live-editor]'),canvas=panel.querySelector('canvas'),context=canvas.getContext('2d'),overlay=panel.querySelector('[data-live-sources]');
   const select=panel.querySelector('[data-live-source]'),brush=panel.querySelector('[data-live-brush]'),beats=panel.querySelector('[data-live-beats]');
   const buttons=new Map(),histories=new Map();let selectedId=null,key=null,gesture=null,geom={left:26,right:600,top:26,bottom:180};
+  const library=window.PhrasePresets,presetList=panel.querySelector('[data-phrase-presets]');
+  let presetGroup='melody',append=false,presetIndex=0,presetSignature='',variation=0;
+  const showInsertion=result=>message(result?.ok?'Вставлена новая фраза «'+result.name+'»':result?.message||'Не удалось вставить фразу');
+  const patternDrag=window.PatternDrag.mount(root,{target:api.dropTarget,preview:api.previewInsertion,insert(fragment,target){showInsertion(api.insertPhrase(fragment,target));}});
   const selected=model=>model?.snapshot.scenes.autumn.find(source=>source.id===selectedId);
   const history=()=>{if(!histories.has(key))histories.set(key,[]);return histories.get(key);};
   function remember(){const model=api.get();if(!model)return;const stack=history();stack.push(clone({sources:model.snapshot.scenes.autumn,nextId:model.snapshot.nextId,selectedId}));if(stack.length>20)stack.shift();}
   function change(update,record=true){if(record)remember();api.update(update);render();}
   function message(text){panel.querySelector('[data-live-status]').textContent=text;}
+  function applyPreset(index){
+   const model=api.get();if(!model)return;
+   try{
+    const result=library.insert(model.snapshot,{group:presetGroup,preset:index,append,notes:api.notes(model.snapshot)},api.create);
+    presetIndex=index;variation=0;change(snapshot=>{snapshot.scenes.autumn=result.scenes.autumn;snapshot.nextId=result.nextId;snapshot.selectedId=result.selectedId;selectedId=result.selectedId;});
+    api.selectSource(selectedId);message(library.groups[presetGroup].presets[index].name+' · '+(append?'добавлено':'партия заменена'));
+   }catch(error){message(error.message);}
+  }
+  function transform(action){
+   const model=api.get();if(!model)return;
+   try{const result=library.transform(model.snapshot,{group:presetGroup,action,variation:++variation,notes:api.notes(model.snapshot)});change(snapshot=>{snapshot.scenes.autumn=result.scenes.autumn;});message({variation:'Новая вариация',shift:'Ритм сдвинут на долю',sparse:'Больше пауз',dense:'Больше движения'}[action]);}catch(error){message(error.message);}
+  }
+  function renderPresets(model){
+   for(const button of panel.querySelectorAll('[data-preset-group]'))button.setAttribute('aria-pressed',String(button.dataset.presetGroup===presetGroup));
+   for(const button of panel.querySelectorAll('[data-preset-mode]'))button.setAttribute('aria-pressed',String((button.dataset.presetMode==='append')===append));
+   if(presetSignature!==presetGroup){
+    presetSignature=presetGroup;presetList.replaceChildren(...library.groups[presetGroup].presets.map((preset,index)=>{
+     const button=document.createElement('button');button.type='button';button.className='phrase-preset';button.dataset.phrasePreset=index;button.setAttribute('aria-keyshortcuts',String(index+1));button.title='Вставить '+preset.name+' · или перетащить между фразами кольца';
+     const number=document.createElement('kbd');number.textContent=index+1;const name=document.createElement('span');name.textContent=preset.name;button.append(number,name);
+     button.addEventListener('click',()=>{if(!patternDrag.didDrag())applyPreset(index);});button.addEventListener('pointerdown',event=>patternDrag.begin(event,{group:presetGroup,preset:index}));return button;
+    }));
+   }
+   const hasPart=model.snapshot.scenes.autumn.some(source=>library.belongs(source,presetGroup));
+   for(const button of panel.querySelectorAll('[data-pattern-transform]'))button.disabled=!hasPart;
+  }
   function add(x=.5,y=.5){
    const model=api.get();if(!model)return;if(model.snapshot.scenes.autumn.length>=16){message('В этой фразе уже 16 источников');return;}
    change(snapshot=>{const source=api.create(brush.value,snapshot,x,y);snapshot.scenes.autumn.push(source);selectedId=source.id;snapshot.selectedId=source.id;});api.selectSource(selectedId);
@@ -54,7 +83,10 @@
   }
   function render(){
    const model=api.get();panel.hidden=!model;root.classList.toggle('is-phrase-editor-open',!!model);if(!model)return;
-   if(key!==model.key){key=model.key;selectedId=model.snapshot.scenes.autumn.find(source=>api.channel(source)===1&&source.type!=='fog')?.id||model.snapshot.scenes.autumn[0]?.id||null;gesture=null;message('');}
+   if(key!==model.key){
+    key=model.key;const first=model.snapshot.scenes.autumn.find(source=>source.id===model.snapshot.selectedId)||model.snapshot.scenes.autumn.find(source=>api.channel(source)===1&&source.type!=='fog')||model.snapshot.scenes.autumn[0];
+    selectedId=first?.id||null;gesture=null;presetGroup=first?Object.keys(library.groups).find(group=>library.belongs(first,group))||'melody':model.kind==='bass'?'bass':model.kind==='drums'?'drums':'melody';presetIndex=0;variation=0;message('');api.selectSource(selectedId);
+   }
    if(!selected(model))selectedId=model.snapshot.scenes.autumn[0]?.id||null;
    panel.querySelector('[data-live-title]').textContent=model.name;
    panel.querySelector('[data-live-context]').textContent=model.playing?'Эта фраза звучит сейчас':'Правки прозвучат при её исполнении';
@@ -65,14 +97,24 @@
    const length=model.snapshot.phraseLength;if(beats.children.length!==length){beats.replaceChildren(...Array.from({length},(_,step)=>{const button=document.createElement('button');button.type='button';button.textContent=step+1;button.dataset.liveBeat=step;button.addEventListener('click',()=>change(snapshot=>{const source=selected({snapshot});if(!source)return;source.steps=source.steps.includes(step)?source.steps.filter(value=>value!==step):[...source.steps,step].sort((a,b)=>a-b);}));return button;}));}
    for(const button of beats.children){const step=Number(button.dataset.liveBeat);button.disabled=!selected(model);button.setAttribute('aria-pressed',String(!!selected(model)?.steps.includes(step)));button.setAttribute('aria-label','Доля '+(step+1)+' выбранного источника');button.dataset.playing=String(model.playing&&model.step===step);}
    for(const name of ['delete','copy'])panel.querySelector('[data-live-'+name+']').disabled=!selected(model);panel.querySelector('[data-live-undo]').disabled=!history().length;
-   draw(model);
+   renderPresets(model);draw(model);
   }
   select.addEventListener('change',()=>choose(Number(select.value)));
   panel.querySelector('[data-live-add]').addEventListener('click',()=>add());panel.querySelector('[data-live-delete]').addEventListener('click',remove);panel.querySelector('[data-live-copy]').addEventListener('click',copy);panel.querySelector('[data-live-undo]').addEventListener('click',undo);
   panel.querySelector('[data-live-close]').addEventListener('click',api.close);panel.querySelector('[data-live-cue]').addEventListener('click',api.cue);
+  for(const button of panel.querySelectorAll('[data-preset-group]'))button.addEventListener('click',()=>{presetGroup=button.dataset.presetGroup;presetIndex=0;render();});
+  for(const button of panel.querySelectorAll('[data-preset-mode]'))button.addEventListener('click',()=>{append=button.dataset.presetMode==='append';render();});
+  for(const button of panel.querySelectorAll('[data-pattern-transform]'))button.addEventListener('click',()=>transform(button.dataset.patternTransform));
+  panel.querySelector('[data-preset-new-phrase]').addEventListener('click',()=>showInsertion(api.insertAfterSelection({group:presetGroup,preset:presetIndex})));
   canvas.addEventListener('pointerdown',event=>{if(event.button===0){const p=coordinates(event);add(p.x,p.y);}});
   canvas.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();add();}});
-  panel.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='z'){event.preventDefault();event.stopPropagation();undo();}});
+  panel.addEventListener('keydown',event=>{
+   if(event.isComposing)return;
+   if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='z'){event.preventDefault();event.stopPropagation();undo();return;}
+   if(event.target.closest('input,select,textarea,[contenteditable]')||event.metaKey||event.ctrlKey||event.altKey)return;
+   if(/^[1-4]$/.test(event.key)){event.preventDefault();event.stopPropagation();applyPreset(Number(event.key)-1);}
+   if(event.key.toLowerCase()==='v'||event.key.toLowerCase()==='м'){event.preventDefault();event.stopPropagation();transform('variation');}
+  });
   render();return {render};
  }
  window.LivePhraseEditor={mount};

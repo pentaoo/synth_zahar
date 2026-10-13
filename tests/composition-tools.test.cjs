@@ -69,3 +69,12 @@ test('new bass, melody and drum layers start with distinct, valid phrases',()=>{
   for(const field of fields){files.validateSnapshot(field.snapshot);assert.ok(field.snapshot.scenes.autumn.length);}
  }
 });
+
+test('drag insertion chooses the nearest gap, including after the final phrase',()=>{
+ for(const count of [1,4,8,16])for(let index=0;index<count;index++){
+  const angle=-Math.PI/2+(index+.05)/count*Math.PI*2;
+  assert.equal(tools.insertionAtPoint(Math.cos(angle)*330,Math.sin(angle)*330,count),index);
+ }
+ const final=-Math.PI/2+Math.PI*2-.01;assert.equal(tools.insertionAtPoint(Math.cos(final)*330,Math.sin(final)*330,8),8);
+ assert.equal(tools.insertionAtPoint(0,0,8),null);
+});

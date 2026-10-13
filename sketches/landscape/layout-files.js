@@ -22,7 +22,8 @@
     if(!record(snapshot)||!VERSIONS.includes(snapshot.version)||!Object.hasOwn(TYPES,snapshot.worldKey)||!record(snapshot.scenes))invalid();
     if(snapshot.performancePatch!==undefined){
       const patch=snapshot.performancePatch;if(!record(patch)||['drive','echo','space','swing','master'].some(key=>!Object.hasOwn(patch,key)))invalid('Неполная панель синтеза.');ranges(patch,{drive:[0,1],echo:[0,.8],space:[0,.8],swing:[0,.5],master:[0,.8]});
-      if(!number(patch.selectedVoice,0,1,true)||!Array.isArray(patch.voices)||patch.voices.length!==2)invalid('Повреждена панель синтеза.');
+      if(!number(patch.selectedVoice,0,2,true)||!Array.isArray(patch.voices)||patch.voices.length!==2)invalid('Повреждена панель синтеза.');
+      if(patch.drums!==undefined){if(!record(patch.drums)||['kick','snare','hat','gain','tone','decay','noise','brightness','drive','echo','space'].some(key=>!Object.hasOwn(patch.drums,key)))invalid('Неполные настройки барабанов.');ranges(patch.drums,{kick:[0,1.5],snare:[0,1.5],hat:[0,1.5],gain:[0,1.5],tone:[.3,2],decay:[.05,1],noise:[0,1],brightness:[300,12000],drive:[0,1],echo:[0,.8],space:[0,.8]});}
       for(const voice of patch.voices){if(!record(voice)||['wave','noise','brightness','fm','harmonicity','detune','motion','lfoRate','attack','release'].some(key=>!Object.hasOwn(voice,key)))invalid('Неполные настройки синта.');ranges(voice,{noise:[0,1],brightness:[300,12000],fm:[0,5],harmonicity:[.5,8],detune:[0,50],motion:[0,1],lfoRate:[.1,12],attack:[.002,1],release:[.03,2]});if(!WAVES.includes(voice.wave))invalid('Неизвестная волна синта.');}
     }
     if(snapshot.version===7) {

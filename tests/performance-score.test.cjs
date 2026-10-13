@@ -28,7 +28,7 @@ test('all modulation generators release on a rest, and live FM, sub, movement an
  assert.equal(f.engine.active.size,6);f.engine.scheduleHeldStep(1,.8);f.setStep(1,.8);f.engine.context.advance(.83);assert.equal(f.engine.active.size,0);
 });
 test('the shared performance patch controls both sounding phrases without replacing their notes',async()=>{
- const f=await fixture([0]);f.evaluate(`let performancePatch=${JSON.stringify(score.patchDefaults)};`);const item=f.item(),x=item.x;f.setStep(0,.1);
+ const f=await fixture([0]);f.evaluate(`performancePatch=${JSON.stringify(score.patchDefaults)};`);const item=f.item(),x=item.x;f.setStep(0,.1);
  const voice=f.engine.voices.get(f.engine.held.get(1).oscillator),node=f.engine.held.get(1).oscillator;
  f.evaluate("performancePatch.voices[1].fm=2;performancePatch.voices[1].wave='sawtooth';performancePatch.voices[1].brightness=2500;");f.engine.configure();
  assert.equal(f.engine.held.get(1).oscillator,node);assert.equal(voice.partials[0].node.type,'sawtooth');assert.equal(voice.filter.frequency.value,2500);assert.equal(item.x,x);
@@ -41,5 +41,16 @@ test('party seeds follow all eight harmonies and contain only their own channel'
  for(const [kind,channel] of [['bass','0'],['melody','1'],['drums','2']]){
   const fields=score.partFields(base,kind);assert.equal(fields.length,8);
   for(const field of fields){files.validateSnapshot(field.snapshot);assert.ok(field.snapshot.scenes.autumn.length);assert.ok(field.snapshot.scenes.autumn.every(source=>source.sound.channel===channel));}
+ }
+});
+
+test('quick timbres morph a sounding synth without replacing its note or its oscillator',async()=>{
+ const f=await fixture([0]);f.evaluate(`performancePatch=${JSON.stringify(score.patchDefaults)};`);f.setStep(0,.1);
+ const node=f.engine.held.get(1).oscillator,x=f.item().x;
+ for(const preset of require('../sketches/landscape/performance-controls.js').timbres){
+  f.evaluate(`Object.assign(performancePatch.voices[1],${JSON.stringify(preset.settings)});`);f.engine.configure();
+  assert.equal(f.engine.held.get(1).oscillator,node);assert.equal(f.item().x,x);
+  const voice=f.engine.voices.get(node);assert.equal(voice.partials[0].node.type,preset.settings.wave);assert.equal(voice.filter.frequency.value,preset.settings.brightness);
+  files.validateSnapshot({...f.serial(),performancePatch:JSON.parse(JSON.stringify(f.evaluate('performancePatch')))});
  }
 });

@@ -6,6 +6,7 @@
   const compositionTools = window.CompositionTools;
   const instruments = window.LandscapeInstruments;
   const score=window.PerformanceScore;
+  const phrasePresets=window.PhrasePresets;
   let performancePatch=clonePerformancePatch(score.patchDefaults),performanceUI=null,liveUI=null,liveEditorOpen=false;
   function clonePerformancePatch(value){return JSON.parse(JSON.stringify(value));}
   let paletteCategory = 'waves', paletteLayer = null, toolInstrument = 'default';
@@ -14,7 +15,7 @@
   let layoutName = '';
   const MAX_FIELDS = 16;
   let fields = [], activeFieldId = 1, queuedFieldId = null, sequenceEnabled = true, fieldCycle = 0, renderedFields = null;
-  let selectedFieldId = 1, fieldDrag = null, ignoreFieldClickUntil = 0;
+  let selectedFieldId = 1, fieldDrag = null, ignoreFieldClickUntil = 0, patternInsertion=null;
   let layers = [], selectedLayerId = 1, currentLayerId = 1, compositionTempo = 96, cycleBeats = 32, renderedLayers = null, audioHost = null, pendingPersistence = false;
   let savedState = null;
   try { const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); savedState = stored?.privateContent || stored; } catch {}
@@ -193,6 +194,7 @@
         gain.connect(pan).connect(this.buses[i < 2 ? 'synth' : 'drum'].input);
         this.channels.push(gain); this.channelPans.push(pan);
       }
+      this.drumLevels={};for(const name of ['kick','snare','hat']){const gain=c.createGain();gain.connect(this.channels[2]);this.drumLevels[name]=gain;}
       this.noise = c.createBuffer(1, c.sampleRate, c.sampleRate);
       const samples = this.noise.getChannelData(0);
       for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
@@ -210,7 +212,9 @@
     configure(when = this.context?.currentTime, updateOutput = true) {
       if (!this.context) return;
       const now = when, base=mix(),patch=typeof performancePatch==='undefined'?null:performancePatch;
-      const config=patch?{...base,master:patch.master,effects:{...base.effects,synth:{...base.effects.synth,drive:patch.drive,delayMix:patch.echo,reverbMix:patch.space}}}:base;
+      const drums=patch?.drums;
+      const config=patch?{...base,master:patch.master,drums:drums?{...base.drums,...drums}:base.drums,effects:{...base.effects,synth:{...base.effects.synth,drive:patch.drive,delayMix:patch.echo,reverbMix:patch.space},drum:drums?{...base.effects.drum,brightness:drums.brightness,drive:drums.drive,delayMix:drums.echo,reverbMix:drums.space}:base.effects.drum}}:base;
+      for(const name of ['kick','snare','hat'])this.drumLevels[name].gain.setTargetAtTime(drums?.[name]??1,now,.015);
       this.master.gain.setTargetAtTime(this.muted||this.previewSuppressed?0:config.master*this.layerGain, now, .02);
       if(updateOutput){this.compressor.threshold.setTargetAtTime(config.threshold, now, .02);this.compressor.ratio.setTargetAtTime(config.ratio, now, .02);}
       for (let i = 0; i < 3; i++) {
@@ -395,14 +399,15 @@
       }
     }
     createDrum(p, when, preset, preview) {
-      const c=this.context,settings=p.sound,config=mix().drums;
+      const c=this.context,settings=p.sound,config={...mix().drums,...(typeof performancePatch==='undefined'?{}:performancePatch.drums)};
       const note=p.note+settings.octave*12+settings.detune/100;
       const pitch=clamp(frequencyFor(note)/frequencyFor(48),.25,4)*config.tone/.7;
       const length=clamp(settings.duration/preset.settings.duration*config.decay/.18,.15,5);
       const amplitude=(.035+p.y*p.y*.28)*settings.gain;
       const filter=c.createBiquadFilter(),pan=c.createStereoPanner();
       filter.type='lowpass';filter.frequency.value=settings.brightness;filter.Q.value=.45;pan.pan.value=settings.pan;
-      filter.connect(pan).connect(this.channels[2]);
+      const family=/kick/.test(preset.id)?'kick':/hat|ride/.test(preset.id)?'hat':'snare';
+      filter.connect(pan).connect(this.drumLevels[family]);
       let remaining=preset.components.length;
       for(const component of preset.components) {
         const node=component.noise?c.createBufferSource():c.createOscillator(),gate=c.createGain();
@@ -678,7 +683,7 @@
     if(!saved)return;
     if(saved.version===7){
       let valid;try{valid=layoutFiles.validateSnapshot(saved);}catch{return;}
-      if(typeof performancePatch!=='undefined'&&valid.performancePatch)performancePatch=clone(valid.performancePatch);
+      if(typeof performancePatch!=='undefined'&&valid.performancePatch)performancePatch={...clone(valid.performancePatch),drums:{...score.patchDefaults.drums,...valid.performancePatch.drums}};
       compositionTempo=valid.compositionTempo;cycleBeats=valid.cycleBeats;sequenceEnabled=valid.sequenceEnabled;
       installLayers(valid.layers,valid.selectedLayerId);
     }else{
@@ -800,6 +805,28 @@
     const result=compositionTools.reordered(fields,id,target);
     if(result.every((field,index)=>field.id===fields[index].id))return;
     remember();fields.splice(0,fields.length,...result);syncFields();persist();status('Порядок фраз изменён');
+  }
+  function patternDropTarget(clientX,clientY){
+    if(editorView!=='composition'||!layers.length)return null;
+    const rect=q('[data-fields]').getBoundingClientRect(),x=(clientX-rect.left-rect.width/2)/rect.width*1000,y=(clientY-rect.top-rect.height/2)/rect.width*1000,radius=Math.hypot(x,y);
+    for(const [depth,layer] of layers.entries()){
+      const radii=compositionTools.ringRadii(layers.length,depth);if(radius<radii.inner||radius>radii.outer)continue;
+      return {layerId:layer.id,index:compositionTools.insertionAtPoint(x,y,layer.fields.length),count:layer.fields.length,radii,allowed:layer.fields.length<MAX_FIELDS};
+    }
+    return null;
+  }
+  function previewPatternInsertion(target){patternInsertion=target;syncFields();}
+  function insertPatternPhrase(fragment,target){
+    const layer=layers.find(layer=>layer.id===target.layerId);if(!layer)return {ok:false,message:'Слой уже удалён'};
+    if(layer.fields.length>=MAX_FIELDS){status('Не больше 16 фраз в слое');return {ok:false,message:'В слое уже 16 фраз'};}
+    storeCurrentLayer();let snapshot;
+    try{withLayer(layer,()=>{captureField();const template=fields[Math.max(0,Math.min(fields.length-1,target.index-1))];snapshot=phrasePresets.insert(template.snapshot,{...fragment,notes:notesForSnapshot(template.snapshot)},createLiveSource);});}
+    catch(error){status(error.message);return {ok:false,message:error.message};}
+    remember();selectLayer(layer.id);const id=Math.max(...fields.map(field=>field.id))+1;
+    const name=phrasePresets.groups[fragment.group].presets[fragment.preset].name;
+    snapshot.bpm=compositionTempo;fields.splice(Math.max(0,Math.min(fields.length,target.index)),0,{id,name,repeats:1,snapshot});
+    selectedFieldId=id;selectedPhraseKeys=new Set([phraseKey(layer.id,id)]);phraseSelectionCleared=false;liveEditorOpen=true;patternInsertion=null;
+    sync();resizeRing();persist();status('Вставлена фраза «'+name+'»');return {ok:true,name};
   }
   function moveField(id,direction) {
     const index=fields.findIndex(field=>field.id===id),target=index+direction;
@@ -953,14 +980,15 @@
     for(const [depth,layer] of layers.entries()) {
       const context=layer.id===currentLayerId?contextState():layer.context;
       const order=fieldDrag?.moved&&fieldDrag.layerId===layer.id?compositionTools.reordered(layer.fields,fieldDrag.id,fieldDrag.target):layer.fields;
+      const insertion=typeof patternInsertion!=='undefined'&&patternInsertion?.layerId===layer.id?patternInsertion:null,count=order.length+(insertion?1:0);
       const radii=compositionTools.ringRadii(layers.length,depth),middle=(radii.outer+radii.inner)/2;
       for(const [index,field] of order.entries()) {
         const card=q('[data-layer-id="'+layer.id+'"][data-field-id="'+field.id+'"]'),button=card.querySelector('button'),sector=card.querySelector('[data-sector]');
         const selected=!phraseSelectionCleared&&(selectedPhraseKeys.size?selectedPhraseKeys.has(phraseKey(layer.id,field.id)):layer.id===selectedLayerId&&field.id===selectedFieldId),active=field.id===context.activeFieldId,queued=field.id===context.queuedFieldId,dragging=fieldDrag?.moved&&fieldDrag.layerId===layer.id&&field.id===fieldDrag.id;
         card.dataset.active=active;card.dataset.selected=selected;card.dataset.queued=queued;card.dataset.dragging=!!dragging;card.dataset.muted=layer.muted;
-        const rotation=dragging?fieldDrag.rotation:index*360/order.length;
-        sector.style.transform='rotate('+rotation+'deg)';card.querySelector('[data-sector-path]').setAttribute('d',compositionTools.sectorPath(order.length,{...radii,notchStart:!dragging&&index===0,notchEnd:!dragging&&index===order.length-1}));
-        const angle=-Math.PI/2+Math.PI/order.length+rotation*Math.PI/180,label=card.querySelector('.phrase-label');
+        const slot=index+(insertion&&index>=insertion.index?1:0),rotation=dragging?fieldDrag.rotation:slot*360/count;
+        sector.style.transform='rotate('+rotation+'deg)';card.querySelector('[data-sector-path]').setAttribute('d',compositionTools.sectorPath(count,{...radii,notchStart:!dragging&&slot===0,notchEnd:!dragging&&slot===count-1}));
+        const angle=-Math.PI/2+Math.PI/count+rotation*Math.PI/180,label=card.querySelector('.phrase-label');
         label.style.left=(50+middle/10*Math.cos(angle))+'%';label.style.top=(50+middle/10*Math.sin(angle))+'%';card.querySelector('.phrase-number').textContent=String(field.id).padStart(2,'0');
         const snapshot=active?{scenes:context.scenes,phraseLength:context.phraseLength}:field.snapshot;
         card.querySelector('.phrase-name').textContent=field.name;
@@ -1305,7 +1333,7 @@
   function liveEditorModel() {
     if(!liveEditorOpen||editorView!=='composition')return null;
     const target=editingFields().find(target=>target.field.id===selectedFieldId&&(!target.layer||target.layer.id===selectedLayerId));if(!target)return null;
-    return {key:phraseKey(selectedLayerId,target.field.id),name:target.field.name,snapshot:target.snapshot,playing:running&&target.live,step:target.live?(target.layer?.context.playingStep??playingStep):null,target};
+    return {key:phraseKey(selectedLayerId,target.field.id),name:target.field.name,kind:target.layer?.kind||'main',snapshot:target.snapshot,playing:running&&target.live,step:target.live?(target.layer?.context.playingStep??playingStep):null,target};
   }
   function updateLivePhrase(update) {
     const model=liveEditorModel();if(!model)return;const target=model.target,ids=new Set(target.snapshot.scenes.autumn.map(source=>source.id));
@@ -1333,6 +1361,10 @@
     const type=held?'fog':channel===2?'raven':channel===0?'drop':'leaf';
     const id=Math.max(snapshot.nextId||1,...Object.values(snapshot.scenes).flat().map(source=>source.id+1));snapshot.nextId=id+1;
     return {id,type,x:snapForSnapshot(channel===2&&x===.5?0:x,snapshot),y:clamp(y,.08,.92),muted:false,steps:held?Array.from({length:snapshot.phraseLength},(_,i)=>i):[0],sound:cleanSourceSettings({...preset.settings,channel:String(channel),instrument:preset.id,...(held?{attack:.2,sustain:.5,release:.5}:{})},type)};
+  }
+  function notesForSnapshot(snapshot){
+    const scale=snapshot.scaleSettings.autumn,steps=modes[scale.mode].steps;
+    return steps?Array.from({length:25},(_,i)=>48+i).filter(note=>steps.includes(((note-scale.tonic)%12+12)%12)):[];
   }
   function syncPerformance() {
     if(typeof performancePatch==='undefined')return;
@@ -1695,17 +1727,30 @@
   performanceUI=window.PerformanceControls.mount(root,{
     get:()=>performancePatch,remember,
     selectVoice(value){performancePatch.selectedVoice=value;persist();},
+    preset(settings){
+      remember();Object.assign(performancePatch.selectedVoice===2?performancePatch.drums:performancePatch.voices[performancePatch.selectedVoice],settings);
+      if(layers.length){storeCurrentLayer();for(const layer of layers)withLayer(layer,()=>sound.configure(undefined,false));}else sound.configure();
+      syncPerformance();persist();
+    },
     change(key,value,voice){
-      if(voice)performancePatch.voices[performancePatch.selectedVoice][key]=value;else performancePatch[key]=value;
+      if(voice==='drums')performancePatch.drums[key]=value;else if(voice)performancePatch.voices[performancePatch.selectedVoice][key]=value;else performancePatch[key]=value;
       if(layers.length){storeCurrentLayer();for(const layer of layers)withLayer(layer,()=>sound.configure(undefined,false));}else sound.configure();
       syncPerformance();persist();
     }
   });
   liveUI=window.LivePhraseEditor.mount(root,{
     get:liveEditorModel,update:updateLivePhrase,create:createLiveSource,snap:snapForSnapshot,channel:sourceChannel,
+    dropTarget:patternDropTarget,previewInsertion:previewPatternInsertion,insertPhrase:insertPatternPhrase,
+    insertAfterSelection(fragment){const layer=currentLayer();if(layer)return insertPatternPhrase(fragment,{layerId:layer.id,index:fields.findIndex(field=>field.id===selectedFieldId)+1});},
     name(source){const channel=sourceChannel(source);return (channel===2?sourceName(source):typeFor(source.type).sustained?'Фон · Синт 2':'Синт '+(channel+1))+' · '+(channel===2?'удар':noteName(48+source.x*24+source.sound.octave*12));},
-    notes(snapshot){const scale=snapshot.scaleSettings.autumn,steps=modes[scale.mode].steps;return steps?Array.from({length:25},(_,i)=>48+i).filter(note=>steps.includes(((note-scale.tonic)%12+12)%12)):[];},
-    selectSource(id){const source=liveEditorModel()?.snapshot.scenes.autumn.find(source=>source.id===id);if(source&&sourceChannel(source)<2){performancePatch.selectedVoice=sourceChannel(source);performanceUI.render();}},
+    notes:notesForSnapshot,
+    selectSource(id){
+      const model=liveEditorModel(),source=model?.snapshot.scenes.autumn.find(source=>source.id===id);if(!source)return;
+      model.snapshot.selectedId=id;
+      if(model.target.live){const select=()=>{selectedId=id;selectedSourceIds=new Set([id]);captureField();};if(model.target.layer)withLayer(model.target.layer,select);else select();}
+      else model.target.field.snapshot.selectedId=id;
+      performancePatch.selectedVoice=sourceChannel(source);performanceUI.render();
+    },
     close(){liveEditorOpen=false;syncPerformance();resizeRing();},
     cue(){chooseField(selectedFieldId);if(!running)q('[data-action="play"]').click();}
   });

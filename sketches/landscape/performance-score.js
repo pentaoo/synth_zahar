@@ -18,7 +18,7 @@
   voices:[
    {wave:'sine',noise:.01,brightness:1900,fm:.2,harmonicity:2,detune:3,motion:.08,lfoRate:2.5,attack:.01,release:.25},
    {wave:'triangle',noise:0,brightness:4800,fm:.12,harmonicity:2.76,detune:5,motion:.08,lfoRate:.8,attack:.01,release:.25}
-  ],drive:.1,echo:.16,space:.2,swing:.06,master:.36
+  ],drums:{kick:1,snare:1,hat:1,gain:.8,tone:.7,decay:.18,noise:.3,brightness:10000,drive:.06,echo:.035,space:.045},drive:.1,echo:.16,space:.2,swing:.06,master:.36
  };
  function fields(base){
   return phrases.map((phrase,index)=>{

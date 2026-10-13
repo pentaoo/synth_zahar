@@ -41,6 +41,11 @@
     const angle = (Math.atan2(y,x) + Math.PI / 2 + TAU) % TAU;
     return Math.min(count-1, Math.floor(angle / TAU * count));
   }
+  function insertionAtPoint(x,y,count){
+    if(!count||Math.hypot(x,y)<.01)return null;
+    const angle=(Math.atan2(y,x)+Math.PI/2+TAU)%TAU;
+    return Math.min(count,Math.round(angle/TAU*count));
+  }
   function reordered(items, id, target) {
     const result = [...items], from = result.findIndex(item => item.id === id);
     if (from < 0) return result;
@@ -107,6 +112,6 @@
     result.worldKey='autumn';result.tool=types[result.tool]||'drop';
     return result;
   }
-  const api={sectorGeometry,sectorPath,addButtonRadius,slotAtPoint,reordered,demoSnapshot,demoFields,defaultTheme,PART_NAMES,ringRadii,layerBeatRate,partFields};
+  const api={sectorGeometry,sectorPath,addButtonRadius,slotAtPoint,insertionAtPoint,reordered,demoSnapshot,demoFields,defaultTheme,PART_NAMES,ringRadii,layerBeatRate,partFields};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else window.CompositionTools=api;
 })();

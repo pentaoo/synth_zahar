@@ -5,6 +5,7 @@ const vm = require('node:vm');
 
 // Execute the browser engine with a controllable audio clock, without a DOM
 // or sound device. These checks follow phrase beats rather than wall time.
+// Declare the optional performance patch before compiling Sound, as the app does.
 const source = fs.readFileSync(path.join(__dirname, '../../sketches/landscape/landscape.js'), 'utf8');
 const between = (start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
 class Parameter {
@@ -42,9 +43,9 @@ for(const kind of ['Gain','DynamicsCompressor','Analyser','BiquadFilter','WaveSh
   AudioContext.prototype['create'+kind]=function(){const node=new AudioNode(kind);this.nodes.push(node);return node;};
 }
 async function fixture(steps) {
-  const context=vm.createContext({window:{AudioContext,PerformanceScore:require('../../sketches/landscape/performance-score.js'),LandscapeInstruments:require('../../sketches/landscape/instruments.js'),LandscapeFiles:require('../../sketches/landscape/layout-files.js'),CompositionTools:require('../../sketches/landscape/composition-tools.js'),SelectionTools:require('../../sketches/landscape/selection-tools.js')},Float32Array,Uint8Array,console});
+  const context=vm.createContext({window:{AudioContext,PhrasePresets:require('../../sketches/landscape/phrase-presets.js'),PerformanceScore:require('../../sketches/landscape/performance-score.js'),LandscapeInstruments:require('../../sketches/landscape/instruments.js'),LandscapeFiles:require('../../sketches/landscape/layout-files.js'),CompositionTools:require('../../sketches/landscape/composition-tools.js'),SelectionTools:require('../../sketches/landscape/selection-tools.js')},Float32Array,Uint8Array,console});
   vm.runInContext(`
-    const layoutFiles=window.LandscapeFiles,compositionTools=window.CompositionTools,instruments=window.LandscapeInstruments,selectionTools=window.SelectionTools;let layoutName='',toolInstrument='default';
+    const phrasePresets=window.PhrasePresets,layoutFiles=window.LandscapeFiles,compositionTools=window.CompositionTools,instruments=window.LandscapeInstruments,selectionTools=window.SelectionTools;let layoutName='',toolInstrument='default',performancePatch;
     let selectedSourceIds=new Set([1]),selectedPhraseKeys=new Set(),phraseSelectionCleared=false,compositionSourceFilter='all';
     const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
     const PITCH_MIN=48,PITCH_SPAN=24,MAX_SOURCES=16;
