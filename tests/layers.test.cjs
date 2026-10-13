@@ -12,7 +12,7 @@ async function layered() {
     let phraseEvents=[],particles=[],ripples=[],ghost=null,drag=null;
     const MAX_FIELDS=8,FALL_TIME=.8,stats={hits:[],peak:0},performance={now:()=>sound.context?.currentTime*1000||0};
     const node={dataset:{},style:{},children:[],setAttribute(){},scrollIntoView(){}};
-    const q=()=>node,all=()=>[],status=()=>{},sync=()=>{},syncFields=()=>{},syncPlayhead=()=>{},paint=()=>{},resize=()=>{},requestAnimationFrame=()=>{};
+    const q=()=>node,all=()=>[],status=()=>{},sync=()=>{},syncFields=()=>{},syncPlayhead=()=>{},paint=()=>{},resize=()=>{},resizeRing=()=>{},requestAnimationFrame=()=>{};
     const root={dataset:{}},remember=()=>{},persist=()=>{},commit=()=>{};
   `+between('  const activeField =','  function persist() {')+
   between('  function restore(saved) {','  const starterSnapshot=')+
@@ -31,7 +31,7 @@ async function layered() {
       init:initializeLayers,
       advance(time){audioHost.context.advance(time);frame(time*1000);},
       state:()=>{storeCurrentLayer();return {tempo:compositionTempo,scope:editorView,running,selectedLayerId,layers:layers.map(layer=>({id:layer.id,active:layer.context.activeFieldId,queued:layer.context.queuedFieldId,beat:layer.context.beat,elapsed:layer.context.elapsed,fields:clone(layer.fields)})),hits:clone(stats.hits)};},
-      engines:()=>layers.map(layer=>layer.engine),choose:chooseField,select:selectLayer,tempo:setCompositionTempo,scope:setEditorView,pause,serial,
+      engines:()=>layers.map(layer=>layer.engine),choose:chooseField,select:selectLayer,tempo:setCompositionTempo,scope:setEditorView,pause,serial,remove:removeLayer,add:addLayer,
       async reload(){const saved=serial();pause();restore(saved);resetAllTransport();await initializeLayers();},
       resume(){anchorClock();running=true;},
       mute(id){const layer=layers.find(item=>item.id===id);layer.muted=layer.engine.muted=true;withLayer(layer,()=>{sound.stop();sound.configure(undefined,false);});},
@@ -107,4 +107,16 @@ test('muting one ring stops its held voice and leaves the other ring playing',as
   c.mute(2);assert.equal(inner.held.size,0);assert.equal(outer.held.get(1).oscillator,note);
   const before=c.state().hits.length;c.tickTo(1.81);
   assert.ok(c.state().hits.slice(before).every(hit=>hit.layerId===1));assert.ok(outer.active.size);
+});
+test('deleting the final ring stops playback, survives restore and allows a new ring on the same audio context',async()=>{
+  const c=await layered();c.tickTo(.81);const [outer,inner]=c.engines(),context=outer.context;
+  c.remove(1);assert.equal(outer.held.size,0);assert.equal(outer.master.connections.length,0);
+  assert.equal(c.state().running,true);assert.equal(c.state().layers[0].id,2);assert.ok(inner.held.size);
+  c.remove(2);assert.equal(c.state().running,false);assert.equal(inner.held.size,0);assert.equal(inner.master.connections.length,0);
+  assert.equal(c.serial().layers.length,0);assert.equal(c.serial().fields.length,0);
+  await c.reload();assert.equal(c.serial().layers.length,0);
+  await c.add('bass');await c.init();const saved=c.serial();
+  assert.equal(saved.layers.length,1);assert.equal(saved.selectedLayerId,1);assert.equal(saved.layers[0].kind,'bass');
+  assert.equal(c.engines()[0].context,context);assert.equal(context.nodes.filter(node=>node.kind==='DynamicsCompressor').length,1);
+  require('../sketches/landscape/layout-files.js').validateSnapshot(saved);
 });

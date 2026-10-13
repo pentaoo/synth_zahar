@@ -26,6 +26,7 @@ async function editor(){
     undo(){restore(history.pop());},
     missingCounter(){delete layers[0].fields[1].snapshot.nextId;},
     allPhrases(){editorView='composition';selectedPhraseKeys=new Set(layers.flatMap(layer=>layer.fields.map(field=>phraseKey(layer.id,field.id))));},
+    phrases(keys){editorView='composition';selectedPhraseKeys=new Set(keys);},
     clearPhrases(){editorView='composition';selectedPhraseKeys.clear();phraseSelectionCleared=true;},
     hold(){playingStep=0;activatedHeld.add(1);sound.syncHeld();storeCurrentLayer();},
     held:()=>layers[0].engine.held.size,
@@ -67,13 +68,22 @@ test('deleting selected phrases across rings is one action and undo restores the
  assert.deepEqual(Array.from(after.layers[0].fields,field=>field.id),[1]);assert.deepEqual(Array.from(after.layers[1].fields,field=>field.id),[2]);assert.equal(e.history(),1);
  e.undo();assert.deepEqual(JSON.parse(JSON.stringify(e.state().layers)),JSON.parse(JSON.stringify(before.layers)));
 });
-test('deleting all phrases retains one playable phrase per ring and undo restores all phrases',async()=>{
+test('deleting all phrases removes every ring and undo restores the complete composition',async()=>{
  const e=await editor();e.allPhrases();e.removePhrases();const state=e.state();
- assert.ok(state.layers.every(layer=>layer.fields.length===1&&layer.activeFieldId===layer.fields[0].id));assert.equal(e.history(),1);
+ assert.equal(state.layers.length,0);assert.equal(state.fields.length,0);assert.equal(state.selectedLayerId,null);assert.equal(state.activeFieldId,null);
+ assert.equal(state.scenes.autumn.length,0);assert.equal(state.scenes.space.length,0);assert.equal(e.history(),1);
+ require('../sketches/landscape/layout-files.js').validateSnapshot(state);
  e.undo();assert.ok(e.state().layers.every(layer=>layer.fields.length===2));
 });
 test('an empty marquee cannot delete the previous phrase',async()=>{
  const e=await editor();e.clearPhrases();e.removePhrases();assert.equal(e.history(),0);assert.ok(e.state().layers.every(layer=>layer.fields.length===2));
+});
+test('deleting every phrase of one ring and part of another removes only the empty ring',async()=>{
+ const e=await editor();const before=e.state();e.phrases(['1:1','1:2','2:1']);e.removePhrases();const after=e.state();
+ assert.equal(after.layers.length,1);assert.equal(after.layers[0].id,2);assert.equal(after.selectedLayerId,2);
+ assert.equal(after.layers[0].fields.length,1);assert.equal(after.layers[0].activeFieldId,2);
+ assert.deepEqual(sources(after,2,2),sources(before,2,2));assert.equal(e.history(),1);
+ e.undo();assert.deepEqual(JSON.parse(JSON.stringify(e.state().layers)),JSON.parse(JSON.stringify(before.layers)));
 });
 test('deleting a selected held source stops its audio voice',async()=>{
  const e=await editor();e.sources([1,2]);e.hold();assert.equal(e.held(),1);e.remove();assert.equal(e.held(),0);assert.equal(sources(e.state()).length,1);

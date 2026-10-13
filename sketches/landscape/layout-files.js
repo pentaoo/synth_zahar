@@ -21,7 +21,7 @@
   function validateSnapshot(snapshot) {
     if(!record(snapshot)||!VERSIONS.includes(snapshot.version)||!Object.hasOwn(TYPES,snapshot.worldKey)||!record(snapshot.scenes))invalid();
     if(snapshot.version===7) {
-      if(!Array.isArray(snapshot.layers)||snapshot.layers.length<1||snapshot.layers.length>4)invalid('В композиции должно быть от 1 до 4 слоёв.');
+      if(!Array.isArray(snapshot.layers)||snapshot.layers.length>4)invalid('В композиции может быть до 4 слоёв.');
       if(!number(snapshot.compositionTempo,45,160,true)||!number(snapshot.cycleBeats,1,128,true))invalid('Повреждены темп или длина оборота.');
       const ids=new Set();
       for(const layer of snapshot.layers){
@@ -29,7 +29,8 @@
         ids.add(layer.id);
         validateSnapshot({...snapshot,version:6,layers:undefined,fields:layer.fields,activeFieldId:layer.activeFieldId});
       }
-      if(!ids.has(snapshot.selectedLayerId))invalid('Неизвестный выбранный слой.');
+      if(snapshot.layers.length){if(!ids.has(snapshot.selectedLayerId))invalid('Неизвестный выбранный слой.');}
+      else if(snapshot.selectedLayerId!==null||snapshot.activeFieldId!==null||snapshot.selectedId!==null||!Array.isArray(snapshot.fields)||snapshot.fields.length||Object.values(snapshot.scenes).some(sources=>!Array.isArray(sources)||sources.length)||typeof snapshot.sequenceEnabled!=='boolean')invalid('Повреждена пустая композиция.');
     }
     if(snapshot.version===6) {
       if(!Array.isArray(snapshot.fields)||snapshot.fields.length<1||snapshot.fields.length>8)invalid('В композиции должно быть от 1 до 8 полей.');

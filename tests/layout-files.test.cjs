@@ -69,6 +69,13 @@ function layeredSnapshot(){
 test('layered files preserve independent phrase counts, selection, gain, mute and common clock',()=>{
  const original=layeredSnapshot();assert.deepEqual(files.decode(files.encode(original,'Кольца')).snapshot,original);
 });
+test('an empty composition round trips without recreating a ring or retaining hidden phrases',()=>{
+ const state={...layeredSnapshot(),layers:[],fields:[],selectedLayerId:null,activeFieldId:null,selectedId:null,scenes:{autumn:[],space:[]}};
+ assert.deepEqual(files.decode(files.encode(state,'Пустая композиция')).snapshot,state);
+ for(const mutate of [s=>s.selectedLayerId=1,s=>s.fields=layeredSnapshot().fields,s=>s.scenes.autumn=snapshot().scenes.autumn]){
+  const candidate=JSON.parse(JSON.stringify(state));mutate(candidate);assert.throws(()=>files.validateSnapshot(candidate));
+ }
+});
 test('a malformed inactive layer rejects the complete file without mutating the original',()=>{
  const state=layeredSnapshot(),before=JSON.stringify(state);
  const mutations=[s=>s.layers=[],s=>s.layers[0].id=2,s=>s.layers[0].gain=2,s=>s.layers[0].muted='yes',s=>s.layers[0].fields[0].snapshot.scenes.autumn[0].x=9,s=>s.layers[0].fields[0].repeats=0,s=>s.layers[1].activeFieldId=99,s=>s.layers[1].kind='unknown',s=>s.selectedLayerId=7,s=>s.compositionTempo=300,s=>s.cycleBeats=0];

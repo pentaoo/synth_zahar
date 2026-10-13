@@ -504,11 +504,20 @@
     const layer={id:record.id,kind:record.kind,gain:engine.layerGain,muted:engine.muted,fields,activeFieldId,context:contextState(),engine};
     applyContext(before);return layer;
   }
-  function installLayers(records,id=records[0].id) {
+  function clearEmptyComposition() {
+    running=false;sound=new Sound();fields=[];
+    selectedLayerId=currentLayerId=activeFieldId=selectedFieldId=null;queuedFieldId=null;
+    scenes={autumn:[],space:[]};selectedId=null;selectedSourceIds=new Set();
+    selectedPhraseKeys.clear();phraseSelectionCleared=true;compositionSourceFilter='all';
+    bpm=compositionTempo;nextId=1;ghost=null;drag=null;fieldDrag=null;pendingPersistence=false;
+    resetTransport(false);
+  }
+  function installLayers(records,id=records[0]?.id) {
     for(const layer of layers){layer.engine.stop();layer.engine.master?.disconnect();}
     audioHost=audioHost?.context?audioHost:null;layers=records.map(buildLayer);
-    selectedLayerId=currentLayerId=layers.some(layer=>layer.id===id)?id:layers[0].id;
-    applyContext(currentLayer().context);renderedFields=null;renderedLayers=null;
+    if(layers.length){selectedLayerId=currentLayerId=layers.some(layer=>layer.id===id)?id:layers[0].id;applyContext(currentLayer().context);}
+    else clearEmptyComposition();
+    renderedFields=null;renderedLayers=null;
   }
   function selectLayer(id,preserveSelection=false) {
     if(!preserveSelection){selectedPhraseKeys.clear();phraseSelectionCleared=false;compositionSourceFilter='all';}
@@ -523,7 +532,7 @@
     for(const layer of layers){layer.engine.previewSuppressed=editorView==='field'&&layer.id!==selectedLayerId;withLayer(layer,()=>sound.configure(undefined,false));}
   }
   async function initializeLayers() {
-    if(!layers.length){await sound.init();return;}
+    if(!layers.length){if(fields.length)await sound.init();return;}
     audioHost=audioHost||layers[0].engine;
     const primary=layers.find(layer=>layer.engine===audioHost)||layers[0];
     if(!audioHost.context)await withLayer(primary,()=>primary.engine.init());
@@ -551,8 +560,8 @@
   function captureField() { if (activeField()) activeField().snapshot = fieldSnapshot(); }
   function serial() {
     captureField();storeCurrentLayer();
-    const snapshot={...fieldSnapshot(),version:layers.length?7:6,fields:clone(fields),activeFieldId,sequenceEnabled};
-    if(layers.length)Object.assign(snapshot,{compositionTempo,cycleBeats,selectedLayerId,layers:layers.map(layer=>({id:layer.id,kind:layer.kind,gain:layer.gain,muted:layer.muted,fields:clone(layer.fields),activeFieldId:layer.activeFieldId}))});
+    const snapshot={...fieldSnapshot(),version:layers.length||!fields.length?7:6,fields:clone(fields),activeFieldId,sequenceEnabled};
+    if(snapshot.version===7)Object.assign(snapshot,{compositionTempo,cycleBeats,selectedLayerId,layers:layers.map(layer=>({id:layer.id,kind:layer.kind,gain:layer.gain,muted:layer.muted,fields:clone(layer.fields),activeFieldId:layer.activeFieldId}))});
     return snapshot;
   }
   function persist() {
@@ -597,7 +606,7 @@
   const isUneditedStarter=layers.length<=1&&fields.length===1&&!layoutName&&bpm===80&&phraseLength===8&&
     JSON.stringify(scenes)===JSON.stringify(starterSnapshot.scenes)&&JSON.stringify(soundSettings)===JSON.stringify(starterSnapshot.soundSettings)&&
     JSON.stringify(scaleSettings)===JSON.stringify(starterSnapshot.scaleSettings)&&JSON.stringify(waveforms)===JSON.stringify(starterSnapshot.waveforms);
-  if (!fields.length || isUneditedStarter) {
+  if ((!fields.length&&selectedLayerId!==null) || isUneditedStarter) {
     fields=compositionTools.demoFields(starterSnapshot);compositionTempo=96;cycleBeats=32;installLayers([{id:1,kind:'main',gain:1,muted:false,fields,activeFieldId:fields[0].id}]);
   }
   function layoutStatus(message,error=false){
@@ -630,6 +639,7 @@
   }
   function syncLayout(){document.title='Музыкальный инструмент';}
   function setEditorView(view) {
+    if(!layers.length&&!fields.length)view='composition';
     const changed=view!==editorView;if(changed&&running)pause();
     if(changed&&view==='field'&&selectedFieldId!==activeFieldId){captureField();activeFieldId=selectedFieldId;restoreField(activeField().snapshot);}
     editorView=view;root.dataset.view=view;
@@ -666,6 +676,7 @@
     }
   }
   function addField(duplicate = false, templateId = selectedFieldId) {
+    if(!fields.length)return;
     if(fields.length>=MAX_FIELDS){status('Не больше восьми фраз');return;}
     remember();captureField();
     const template=fields.find(field=>field.id===templateId)||activeField(),id=Math.max(...fields.map(field=>field.id))+1;
@@ -685,8 +696,8 @@
     if(index<0||target<0||target>=fields.length)return;reorderField(id,target);
   }
   function deleteField(id=selectedFieldId) {
-    if(fields.length<2)return;
     const index=fields.findIndex(field=>field.id===id);if(index<0)return;
+    if(fields.length===1){removeLayer(selectedLayerId);return;}
     remember();captureField();const deletingActive=id===activeFieldId;
     if(deletingActive)resetTransport();
     fields.splice(index,1);if(queuedFieldId===id)queuedFieldId=null;
@@ -730,7 +741,7 @@
   }
   function positionFieldActions() {
     const actions=q('[data-field-actions]'),ring=q('[data-fields]');
-    actions.hidden=!!fieldDrag?.moved||phraseSelectionCleared;
+    actions.hidden=!fields.length||!!fieldDrag?.moved||phraseSelectionCleared;
     const index=fields.findIndex(field=>field.id===selectedFieldId);if(index<0)return;
     const angle=-Math.PI/2+(index+.5)*Math.PI*2/fields.length;
     const size=ring.getBoundingClientRect().width,panel=q('[data-composition]').getBoundingClientRect(),rect=ring.getBoundingClientRect();
@@ -749,19 +760,26 @@
   async function addLayer(kind) {
     if(layers.length>=4)return;
     remember();captureField();storeCurrentLayer();
-    const layer=buildLayer({id:Math.max(...layers.map(item=>item.id))+1,kind,gain:.8,muted:false,fields:compositionTools.partFields(fieldSnapshot(),kind)});
+    const layer=buildLayer({id:Math.max(0,...layers.map(item=>item.id))+1,kind,gain:.8,muted:false,fields:compositionTools.partFields(fieldSnapshot(),kind)});
     layers.push(layer);selectedLayerId=currentLayerId=layer.id;applyContext(layer.context);
+    selectedPhraseKeys.clear();phraseSelectionCleared=false;compositionSourceFilter='all';
     q('[data-layer-picker]').hidden=true;resetAllTransport();
     if(running){try{await initializeLayers();}catch(error){pause();status(error.message);}}
     sync();persist();
   }
+  function discardLayers(ids) {
+    storeCurrentLayer();
+    for(const layer of layers)if(ids.has(layer.id)){layer.engine.stop();layer.engine.master?.disconnect();}
+    layers=layers.filter(layer=>!ids.has(layer.id));
+    selectedPhraseKeys=new Set([...selectedPhraseKeys].filter(key=>!ids.has(Number(key.split(':')[0]))));
+    if(!layers.length)clearEmptyComposition();
+    else if(ids.has(selectedLayerId)){selectedLayerId=currentLayerId=layers[0].id;applyContext(layers[0].context);}
+    fieldDrag=null;ghost=null;drag=null;renderedLayers=null;updateLayerAudibility();
+  }
   function removeLayer(id) {
-    if(layers.length<2)return;
-    const layer=layers.find(item=>item.id===id);if(!layer)return;
-    remember();captureField();storeCurrentLayer();layer.engine.stop();layer.engine.master?.disconnect();
-    layers=layers.filter(item=>item.id!==id);
-    if(selectedLayerId===id){selectedLayerId=currentLayerId=layers[0].id;applyContext(layers[0].context);}
-    fieldDrag=null;renderedLayers=null;sync();persist();
+    if(!layers.some(layer=>layer.id===id))return;
+    remember();captureField();discardLayers(new Set([id]));
+    if(!layers.length&&editorView!=='composition')setEditorView('composition');else sync();persist();
   }
   function syncLayers() {
     const panel=q('[data-layer-controls]'),signature=layers.map(layer=>layer.id).join(',');
@@ -782,7 +800,6 @@
     for(const layer of layers){
       const row=q('[data-layer-row="'+layer.id+'"]');row.querySelector('.layer-name').setAttribute('aria-pressed',String(layer.id===selectedLayerId));
       row.querySelector('.layer-mute').setAttribute('aria-pressed',String(layer.muted));row.querySelector('.layer-mute').setAttribute('aria-label',(layer.muted?'Включить':'Приглушить')+' слой '+compositionTools.PART_NAMES[layer.kind]);
-      row.querySelector('.layer-remove').disabled=layers.length<2;
       const input=row.querySelector('input');if(document.activeElement!==input)input.value=layer.gain;
     }
     root.dataset.layerCount=layers.length;
@@ -845,11 +862,12 @@
       for(const layer of layers){const button=document.createElement('button');button.type='button';button.className='ring-add-phrase';const symbol=document.createElement('span');symbol.className='add-symbol';symbol.setAttribute('aria-hidden','true');symbol.textContent='+';button.append(symbol);button.dataset.layerAdd=layer.id;button.setAttribute('aria-label','Добавить фразу в слой '+compositionTools.PART_NAMES[layer.kind]);button.title='Добавить фразу';button.addEventListener('click',()=>{selectLayer(layer.id);addField();});q('[data-fields]').append(button);}
     }
     for(const [depth,layer] of layers.entries()){const radii=compositionTools.ringRadii(layers.length,depth),button=q('[data-layer-add="'+layer.id+'"]');button.style.top=(50-(radii.outer+radii.inner)/20)+'%';button.style.setProperty('--add-scale',compositionTools.addButtonRadius(radii)*2/1000);button.disabled=layer.fields.length>=MAX_FIELDS;}
-    const center=q('[data-action="add-layer"]'),inner=compositionTools.ringRadii(layers.length,layers.length-1).inner;
+    const center=q('[data-action="add-layer"]'),inner=layers.length?compositionTools.ringRadii(layers.length,layers.length-1).inner:110;
     center.style.setProperty('--add-scale',Math.min(170,inner*1.55)/1000);
+    if(!fields.length){q('[data-repeats-popover]').hidden=true;positionFieldActions();return;}
     if(!fields.some(field=>field.id===selectedFieldId))selectedFieldId=activeFieldId;
     const chosen=fields.find(field=>field.id===selectedFieldId),index=fields.indexOf(chosen);
-    q('[data-control="sequence"]').checked=sequenceEnabled;q('[data-action="duplicate-field"]').disabled=phraseBatch()||fields.length>=MAX_FIELDS;q('[data-action="delete-field"]').disabled=phraseBatch()?!removablePhrases().length:fields.length<2;q('[data-action="edit-field"]').disabled=phraseBatch();
+    q('[data-control="sequence"]').checked=sequenceEnabled;q('[data-action="duplicate-field"]').disabled=phraseBatch()||fields.length>=MAX_FIELDS;q('[data-action="delete-field"]').disabled=phraseBatch()&&!removablePhrases().length;q('[data-action="edit-field"]').disabled=phraseBatch();
     q('[data-field-move="-1"]').disabled=phraseBatch()||index===0;q('[data-field-move="1"]').disabled=phraseBatch()||index===fields.length-1;
     const input=q('[data-control="field-repeats"]');if(document.activeElement!==input)controlState(input,phraseBatch()?editingFields().map(target=>target.field.repeats):[chosen.repeats]);
     q('[data-action="delete-field"]').setAttribute('aria-label',phraseBatch()?'Удалить выбранные фразы':'Удалить фразу');
@@ -869,7 +887,7 @@
   function editingFields() {
     storeCurrentLayer();
     if(editorView==='composition'&&phraseSelectionCleared)return [];
-    if(!layers.length)return [{layer:null,field:activeField(),live:true,snapshot:fieldSnapshot()}];
+    if(!layers.length)return activeField()?[{layer:null,field:activeField(),live:true,snapshot:fieldSnapshot()}]:[];
     return layers.flatMap(layer=>layer.fields.filter(field=>phraseBatch()?selectedPhraseKeys.has(phraseKey(layer.id,field.id)):layer.id===selectedLayerId&&field.id===activeFieldId).map(field=>{
       const live=field.id===layer.context.activeFieldId,c=layer.context;
       return {layer,field,live,snapshot:live?{...field.snapshot,phraseLength:c.phraseLength,scenes:c.scenes,scaleSettings:c.scaleSettings,waveforms:c.waveforms,soundSettings:c.soundSettings}:field.snapshot};
@@ -970,17 +988,14 @@
   }
 
   function removablePhrases() {
-    return layers.flatMap(layer=>{
-      const chosen=layer.fields.filter(field=>selectedPhraseKeys.has(phraseKey(layer.id,field.id)));
-      const survivor=chosen.length===layer.fields.length?layer.context.activeFieldId:null;
-      return chosen.filter(field=>field.id!==survivor).map(field=>({layer,field}));
-    });
+    return layers.flatMap(layer=>layer.fields.filter(field=>selectedPhraseKeys.has(phraseKey(layer.id,field.id))).map(field=>({layer,field})));
   }
   function deletePhraseSelection() {
     if(phraseSelectionCleared)return;
     if(!phraseBatch()){deleteField(selectedFieldId);return;}
     const removed=removablePhrases();if(!removed.length)return;remember();storeCurrentLayer();
-    for(const layer of new Set(removed.map(target=>target.layer)))withLayer(layer,()=>{
+    const emptyLayers=new Set(layers.filter(layer=>removed.filter(target=>target.layer===layer).length===layer.fields.length).map(layer=>layer.id));
+    for(const layer of new Set(removed.map(target=>target.layer).filter(layer=>!emptyLayers.has(layer.id))))withLayer(layer,()=>{
       captureField();const ids=new Set(removed.filter(target=>target.layer===layer).map(target=>target.field.id)),index=fields.findIndex(field=>field.id===activeFieldId),activeRemoved=ids.has(activeFieldId);
       if(activeRemoved)resetTransport();
       fields.splice(0,fields.length,...fields.filter(field=>!ids.has(field.id)));
@@ -989,6 +1004,7 @@
       if(!fields.some(field=>field.id===selectedFieldId))selectedFieldId=activeFieldId;
       captureField();
     });
+    if(emptyLayers.size)discardLayers(emptyLayers);
     for(const target of removed)selectedPhraseKeys.delete(phraseKey(target.layer.id,target.field.id));
     focusPhraseSelection();persist();status('Удалены фразы: '+removed.length);
   }
@@ -1040,7 +1056,7 @@
   function commit(){sound.cancelHeldSchedules();for(const event of phraseEvents)event.heldScheduled=false;sound.configure();sync();persist();}
   function anchorClock(){audioAnchor=((audioHost?.context||sound.context)?.currentTime||0)-elapsed;wallAnchor=performance.now()/1000-elapsed;}
   function resetTransport(isolated=usesCycleClock()){sound.stop();if(!isolated)elapsed=0;beat=0;nextPhraseBeat=0;playingStep=null;playingStepAt=null;phraseEvents=[];particles=[];ripples=[];activatedHeld.clear();queuedFieldId=null;fieldCycle=0;if(!isolated)anchorClock();lastTime=performance.now();if(isEditorLayer())syncPlayhead();}
-  function addSource(type,x,y,template=null){if(scene().length>=MAX_SOURCES){status('На сцене уже 16 источников');return;}remember();const e={id:nextId++,type,x:snapX(x),y:clamp(y,.08,.92),steps:template?[...template.steps]:typeFor(type).sustained?allPhraseSteps():[0],muted:template?.muted||false,sound:cleanSourceSettings(template?.sound||{...instruments.get(toolInstrument)?.settings,instrument:toolInstrument},type)};scene().push(e);selectedId=e.id;selectedSourceIds=new Set([e.id]);openInspector('source');commit();status(typeFor(type).sustained?'Непрерывная нота: выбери справа доли, на которых она звучит':'Источник размещён. Отметь справа доли, на которых он звучит');}
+  function addSource(type,x,y,template=null){if(!activeField())return;if(scene().length>=MAX_SOURCES){status('На сцене уже 16 источников');return;}remember();const e={id:nextId++,type,x:snapX(x),y:clamp(y,.08,.92),steps:template?[...template.steps]:typeFor(type).sustained?allPhraseSteps():[0],muted:template?.muted||false,sound:cleanSourceSettings(template?.sound||{...instruments.get(toolInstrument)?.settings,instrument:toolInstrument},type)};scene().push(e);selectedId=e.id;selectedSourceIds=new Set([e.id]);openInspector('source');commit();status(typeFor(type).sustained?'Непрерывная нота: выбери справа доли, на которых она звучит':'Источник размещён. Отметь справа доли, на которых он звучит');}
   function removeSource(){deleteSources();}
   function setScale(property,value){editFields(snapshot=>{snapshot.scaleSettings.autumn[property]=value;snapshot.scenes.autumn.forEach(source=>source.x=snapForSnapshot(source.x,snapshot));});ghost=null;}
   function coordinates(event){const rect=canvas.getBoundingClientRect();return {x:clamp((event.clientX-rect.left-geom.left)/(geom.right-geom.left),0,1),y:clamp((geom.bottom-(event.clientY-rect.top))/(geom.bottom-geom.top),.08,.92)};}
@@ -1128,6 +1144,10 @@
     });
   }
   function sync(){
+    if(!layers.length&&!fields.length&&editorView!=='composition'){setEditorView('composition');return;}
+    q('[data-action="play"]').disabled=!fields.length;q('[data-action="restart"]').disabled=!fields.length;
+    for(const action of ['audition-tool','place-center','example','clear'])q('[data-action="'+action+'"]').disabled=!fields.length;
+    all('[data-editor-view]').forEach(button=>button.disabled=!fields.length&&button.dataset.editorView==='field');
     q('[data-control="tempo"]').value=compositionTempo;
     const fieldTargets=editingFields();
     controlState(q('[data-control="phrase-length"]'),fieldTargets.map(target=>target.snapshot.phraseLength));
@@ -1438,7 +1458,7 @@
     if(event.key==='Escape'){ghost=null;selectedPhraseKeys.clear();phraseSelectionCleared=false;selectSources(selectedId===null?[]:[selectedId]);sync();if(queuedFieldId!==null){queuedFieldId=null;syncFields();status('Ручной переход отменён');}paint();}
   });
   function pause(){running=false;const stop=()=>{sound.stop();for(const event of phraseEvents)event.heldScheduled=false;particles.filter(p=>!p.done).forEach(p=>p.scheduled=false);};if(layers.length){storeCurrentLayer();for(const layer of layers)withLayer(layer,stop);applyContext(currentLayer().context);}else stop();sync();}
-  q('[data-action="play"]').addEventListener('click',async()=>{const button=q('[data-action="play"]');button.disabled=true;try{if(running){pause();status('Пауза: позиция во фразе сохранена');}else{try{await initializeLayers();}catch(error){status(error.message);return;}status('Фраза по кругу · предметы одной доли касаются земли вместе');anchorClock();running=true;if(layers.length&&editorView==='composition'){storeCurrentLayer();for(const layer of layers)withLayer(layer,()=>sound.syncHeld());}else sound.syncHeld();sync();}}finally{button.disabled=false;}});
+  q('[data-action="play"]').addEventListener('click',async()=>{const button=q('[data-action="play"]');button.disabled=true;try{if(running){pause();status('Пауза: позиция во фразе сохранена');}else{try{await initializeLayers();}catch(error){status(error.message);return;}if(!fields.length)return;status('Фраза по кругу · предметы одной доли касаются земли вместе');anchorClock();running=true;if(layers.length&&editorView==='composition'){storeCurrentLayer();for(const layer of layers)withLayer(layer,()=>sound.syncHeld());}else sound.syncHeld();sync();}}finally{button.disabled=!fields.length;}});
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&running){pause();status('Пауза');}});
   window.addEventListener('openai:set_globals',event=>{const saved=event.detail?.globals?.widgetState?.privateContent;if(!saved||JSON.stringify(saved)===lastPersisted)return;running=false;restore(saved);lastPersisted=null;resetTransport();sync();});
   root.__landscapeLab={state:()=>({...serial(),scope:editorView,layerClocks:layers.map(layer=>({id:layer.id,activeFieldId:layer.context.activeFieldId,queuedFieldId:layer.context.queuedFieldId,playingStep:layer.context.playingStep,beat:layer.context.beat,elapsed:layer.context.elapsed})),selectedFieldId,selectedSourceIds:[...selectedSourceIds],selectedPhraseKeys:[...selectedPhraseKeys],draggedFieldId:fieldDrag?.id||null,queuedFieldId,fieldCycle,running,elapsed,beat,playingStep,nextPhraseBeat,phraseClock:phraseClock(),rings:scene().map(source=>({id:source.id,segments:ringSegments(source)})),pitch:{min:PITCH_MIN,max:PITCH_MAX,allowed:allowedNotes(),free:scale().mode==='free'},particles:particles.map(p=>({id:p.id,x:p.x,y:p.y,note:p.note,start:p.start,step:p.step,group:p.group})),hits:[...stats.hits],activeNotes:soundingAll().map(v=>({...v,name:v.channel===2?'перкуссия':noteName(v.note)})),audioState:sound.context?.state||'off',audioPeak:stats.peak,visualization:{enabled:showAudio,wavePeak:sound.peak,spectrumPeak:sound.spectrum?Math.max(...sound.spectrum):0}}),geometry:()=>({...geom,w,h}),audioSettings:()=>clone(mix())};
