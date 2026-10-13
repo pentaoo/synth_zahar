@@ -115,7 +115,8 @@
    if(/^[1-4]$/.test(event.key)){event.preventDefault();event.stopPropagation();applyPreset(Number(event.key)-1);}
    if(event.key.toLowerCase()==='v'||event.key.toLowerCase()==='м'){event.preventDefault();event.stopPropagation();transform('variation');}
   });
-  render();return {render};
+  function reset(){histories.clear();selectedId=null;key=null;gesture=null;append=false;variation=0;render();}
+  render();return {render,reset};
  }
  window.LivePhraseEditor={mount};
 })();

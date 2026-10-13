@@ -4,12 +4,12 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f4f5ee"><meta name="description" content="Пейзаж — музыкальный инструмент. Собери повторяющуюся фразу из предметов на холсте.">
 <title>Пейзаж — звуковой холст</title>
-<link rel="stylesheet" href="./sketches/landscape/landscape.css?v=20261013-live-parts"><script src="./sketches/landscape/instruments.js?v=20261013-live-parts" defer></script><script src="./sketches/landscape/layout-files.js?v=20261013-live-parts" defer></script><script src="./sketches/landscape/composition-tools.js?v=20261013-live-parts" defer></script><script src="./sketches/landscape/selection-tools.js?v=20261013-live-parts" defer></script>
-<script src="./sketches/landscape/performance-score.js?v=20261013-live-parts" defer></script><script src="./sketches/landscape/knobs.js?v=20261013-live-parts" defer></script><script src="./sketches/landscape/performance-controls.js?v=20261013-live-parts" defer></script>
-<script src="./sketches/landscape/output-scope.js?v=20261013-live-parts" defer></script>
-<script src="./sketches/landscape/phrase-presets.js?v=20261013-live-parts" defer></script><script src="./sketches/landscape/pattern-drag.js?v=20261013-live-parts" defer></script>
-<script src="./sketches/landscape/live-phrase-editor.js?v=20261013-live-parts" defer></script>
-<script src="./sketches/landscape/landscape.js?v=20261013-live-parts" defer></script>
+<link rel="stylesheet" href="./sketches/landscape/landscape.css?v=20261013-demo-reset"><script src="./sketches/landscape/instruments.js?v=20261013-demo-reset" defer></script><script src="./sketches/landscape/layout-files.js?v=20261013-demo-reset" defer></script><script src="./sketches/landscape/composition-tools.js?v=20261013-demo-reset" defer></script><script src="./sketches/landscape/selection-tools.js?v=20261013-demo-reset" defer></script>
+<script src="./sketches/landscape/performance-score.js?v=20261013-demo-reset" defer></script><script src="./sketches/landscape/knobs.js?v=20261013-demo-reset" defer></script><script src="./sketches/landscape/performance-controls.js?v=20261013-demo-reset" defer></script>
+<script src="./sketches/landscape/output-scope.js?v=20261013-demo-reset" defer></script>
+<script src="./sketches/landscape/phrase-presets.js?v=20261013-demo-reset" defer></script><script src="./sketches/landscape/pattern-drag.js?v=20261013-demo-reset" defer></script>
+<script src="./sketches/landscape/live-phrase-editor.js?v=20261013-demo-reset" defer></script>
+<script src="./sketches/landscape/landscape.js?v=20261013-demo-reset" defer></script>
 </head>
 <body>
 <main id="landscape-lab-01" class="landscape-lab performance-mode" data-world="autumn">
@@ -123,7 +123,7 @@
     <div class="performance-output"><span>Выход</span><canvas data-output-scope role="img" aria-label="Спектр и звуковая волна общего выхода после эффектов"></canvas></div>
    </div>
    <div class="palette-area"><div class="palette-toolbar"><div class="instrument-categories" role="group" aria-label="Источники звука"><button type="button" data-instrument-category="waves" aria-pressed="true">Волны</button><button type="button" data-instrument-category="drums" aria-pressed="false">Барабаны</button></div><button type="button" class="tool-audition" data-action="audition-tool" aria-label="Прослушать выбранный тембр" title="Прослушать выбранный тембр">▷</button></div><div class="ll-palette" role="group" aria-label="Предмет для размещения" data-palette></div></div>
-   <div class="ll-transport"><div class="transport-buttons"><button data-action="restart" class="restart-button" aria-label="Сначала" title="Сначала">↺</button><button data-action="play" class="ll-play" aria-pressed="false">Играть</button></div><label class="ll-tempo">ТЕМП <span><input data-control="tempo" type="number" min="45" max="160" value="80" aria-label="Темп в ударах в минуту"> <small>BPM</small></span></label></div>
+   <div class="ll-transport"><div class="transport-buttons"><button data-action="restart" class="restart-button" aria-label="Сначала" title="Сначала · вернуть исходную композицию и звучание">↺</button><button data-action="play" class="ll-play" aria-pressed="false">Играть</button></div><label class="ll-tempo">ТЕМП <span><input data-control="tempo" type="number" min="45" max="160" value="80" aria-label="Темп в ударах в минуту"> <small>BPM</small></span></label></div>
   </div>
  </footer>
 </main>

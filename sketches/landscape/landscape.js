@@ -7,7 +7,7 @@
   const instruments = window.LandscapeInstruments;
   const score=window.PerformanceScore;
   const phrasePresets=window.PhrasePresets;
-  let performancePatch=clonePerformancePatch(score.patchDefaults),performanceUI=null,liveUI=null,liveEditorOpen=false;
+  let performancePatch=clonePerformancePatch(score.patchDefaults),performanceUI=null,liveUI=null,liveEditorOpen=false,resettingPerformance=false;
   function clonePerformancePatch(value){return JSON.parse(JSON.stringify(value));}
   let paletteCategory = 'waves', paletteLayer = null, toolInstrument = 'default';
   const selectionTools = window.SelectionTools;
@@ -699,15 +699,40 @@
     }
     layoutName=layoutFiles.normalizeName(saved.layoutName);showAudio=true;fieldDrag=null;selectedPhraseKeys.clear();phraseSelectionCleared=false;
   }
-  const starterSnapshot=fieldSnapshot();
-  restore(window.openai?.widgetState?.privateContent || savedState);
-  const initialSaved=window.openai?.widgetState?.privateContent||savedState;
-  if(!initialSaved?.performanceVersion){
-    if(initialSaved)try{localStorage.setItem(STORAGE_KEY+'-before-performance',JSON.stringify(initialSaved));}catch{}
-    fields=score.fields(starterSnapshot);compositionTempo=96;cycleBeats=64;sequenceEnabled=true;
-    installLayers([{id:1,kind:'main',gain:1,muted:false,fields,activeFieldId:1}]);
-    layoutName='Пейзаж · восемь фраз';
+  function savePreviousPerformance(snapshot) {
+    try {
+      localStorage.setItem(STORAGE_KEY+'-before-demo',JSON.stringify(snapshot));
+      q('[data-action="restore-previous"]').hidden=false;
+    } catch {}
   }
+  function loadPerformanceScore() {
+    // Always build fresh copies: live edits must never change the recording baseline.
+    running=false;performancePatch=clone(score.patchDefaults);
+    compositionTempo=96;cycleBeats=64;sequenceEnabled=true;
+    installLayers([{id:1,kind:'main',gain:1,muted:false,fields:score.fields(starterSnapshot),activeFieldId:1}]);
+    layoutName='Пейзаж · восемь фраз';
+    showAudio=true;pendingPersistence=false;patternInsertion=null;fieldDrag=null;ghost=null;drag=null;marquee=null;
+    selectedPhraseKeys.clear();phraseSelectionCleared=false;compositionSourceFilter='all';
+    stats.hits.length=0;stats.peak=0;resetAllTransport();
+  }
+  async function restartPerformance() {
+    if(resettingPerformance)return;
+    resettingPerformance=true;const resume=running;
+    remember();savePreviousPerformance(serial());
+    try {
+      loadPerformanceScore();setEditorView('composition');liveUI?.reset();sync();
+      if(resume){await initializeLayers();anchorClock();running=true;}
+      commit();status('Исходная композиция и звучание восстановлены · с первой фразы');
+    } catch(error) {status('Не удалось запустить композицию: '+error.message);}
+    finally {resettingPerformance=false;sync();}
+  }
+  const starterSnapshot=fieldSnapshot();
+  const initialSaved=window.openai?.widgetState?.privateContent||savedState;
+  if(initialSaved){
+    if(!initialSaved.performanceVersion)try{localStorage.setItem(STORAGE_KEY+'-before-performance',JSON.stringify(initialSaved));}catch{}
+    savePreviousPerformance(initialSaved);
+  }
+  loadPerformanceScore();
   function layoutStatus(message,error=false){
     const output=q('[data-layout-status]');output.textContent=message;output.dataset.state=error?'error':'success';
     status(message);
@@ -1373,11 +1398,11 @@
     const current=activeField(),next=fields.find(field=>field.id===nextFieldId());
     q('[data-current-phrase]').textContent=current?.name||'Пустая композиция';
     q('[data-next-phrase]').textContent=next?(queuedFieldId!==null?'Выбрана следующей: ':'Далее: ')+next.name:'По кругу';
-    const button=q('[data-action="performance-play"]');button.textContent=running?'Ⅱ':'▶';button.setAttribute('aria-pressed',String(running));button.setAttribute('aria-label',running?'Пауза':'Играть композицию');button.disabled=!fields.length;
+    const button=q('[data-action="performance-play"]');button.textContent=running?'Ⅱ':'▶';button.setAttribute('aria-pressed',String(running));button.setAttribute('aria-label',running?'Пауза':'Играть композицию');button.disabled=resettingPerformance||!fields.length;
   }
   function sync(){
     if(!layers.length&&!fields.length&&editorView!=='composition'){setEditorView('composition');return;}
-    q('[data-action="play"]').disabled=!fields.length;q('[data-action="restart"]').disabled=!fields.length;
+    q('[data-action="play"]').disabled=resettingPerformance||!fields.length;q('[data-action="restart"]').disabled=resettingPerformance;
     for(const action of ['audition-tool','place-center','example','clear'])q('[data-action="'+action+'"]').disabled=!fields.length;
     all('[data-editor-view]').forEach(button=>button.disabled=!fields.length&&button.dataset.editorView!=='composition');
     q('[data-control="tempo"]').value=compositionTempo;
@@ -1611,7 +1636,7 @@
   q('[data-action="mute"]').addEventListener('click',muteSources);q('[data-action="duplicate"]').addEventListener('click',duplicateSources);q('[data-action="delete"]').addEventListener('click',removeSource);
   q('[data-action="clear"]').addEventListener('click',()=>{remember();scenes[worldKey]=[];particles=[];ripples=[];activatedHeld.clear();sound.stop();selectedId=null;commit();status('Сцена очищена. Отменить вернёт источники');});
   q('[data-action="undo"]').addEventListener('click',()=>{const previous=history.pop();if(!previous)return;if(running)pause();restore(previous);resetAllTransport();q('[data-action="undo"]').disabled=!history.length;commit();const message='Последнее изменение отменено · фраза с начала';if(inspectorTab==='layouts')layoutStatus(message);else status(message);});
-  q('[data-action="restart"]').addEventListener('click',()=>{resetAllTransport();sync();status('Фраза с первой доли');});
+  q('[data-action="restart"]').addEventListener('click',restartPerformance);
   q('[data-control="tonic"]').addEventListener('change',event=>setScale('tonic',Number(event.target.value)));q('[data-control="mode"]').addEventListener('change',event=>setScale('mode',event.target.value));
   q('[data-control="tempo"]').addEventListener('change',event=>setCompositionTempo(event.target.value));
   q('[data-control="phrase-length"]').addEventListener('change',event=>{const length=clamp(Math.round(Number(event.target.value)||8),1,32);editFields(snapshot=>snapshot.phraseLength=length);});
@@ -1720,7 +1745,7 @@
     if(event.key==='Escape'){ghost=null;selectedPhraseKeys.clear();phraseSelectionCleared=false;selectSources(selectedId===null?[]:[selectedId]);sync();if(queuedFieldId!==null){queuedFieldId=null;syncFields();status('Ручной переход отменён');}paint();}
   });
   function pause(){running=false;const stop=()=>{sound.stop();for(const event of phraseEvents)event.heldScheduled=false;particles.filter(p=>!p.done).forEach(p=>p.scheduled=false);};if(layers.length){storeCurrentLayer();for(const layer of layers)withLayer(layer,stop);applyContext(currentLayer().context);}else stop();sync();}
-  q('[data-action="play"]').addEventListener('click',async()=>{const button=q('[data-action="play"]');button.disabled=true;try{if(running){pause();status('Пауза: позиция во фразе сохранена');}else{try{await initializeLayers();}catch(error){status(error.message);return;}if(!fields.length)return;status('Фраза по кругу · предметы одной доли касаются земли вместе');anchorClock();running=true;if(layers.length&&editorView==='composition'){storeCurrentLayer();for(const layer of layers)withLayer(layer,()=>sound.syncHeld());}else sound.syncHeld();sync();}}finally{button.disabled=!fields.length;}});
+  q('[data-action="play"]').addEventListener('click',async()=>{if(resettingPerformance)return;const button=q('[data-action="play"]');button.disabled=true;try{if(running){pause();status('Пауза: позиция во фразе сохранена');}else{try{await initializeLayers();}catch(error){status(error.message);return;}if(!fields.length)return;status('Фраза по кругу · предметы одной доли касаются земли вместе');anchorClock();running=true;if(layers.length&&editorView==='composition'){storeCurrentLayer();for(const layer of layers)withLayer(layer,()=>sound.syncHeld());}else sound.syncHeld();sync();}}finally{button.disabled=resettingPerformance||!fields.length;}});
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&running){pause();status('Пауза');}});
   window.addEventListener('openai:set_globals',event=>{const saved=event.detail?.globals?.widgetState?.privateContent;if(!saved||JSON.stringify(saved)===lastPersisted)return;running=false;restore(saved);lastPersisted=null;resetTransport();sync();});
   root.__landscapeLab={state:()=>({...serial(),scope:editorView,layerClocks:layers.map(layer=>({id:layer.id,activeFieldId:layer.context.activeFieldId,queuedFieldId:layer.context.queuedFieldId,playingStep:layer.context.playingStep,beat:layer.context.beat,elapsed:layer.context.elapsed})),selectedFieldId,selectedSourceIds:[...selectedSourceIds],selectedPhraseKeys:[...selectedPhraseKeys],draggedFieldId:fieldDrag?.id||null,queuedFieldId,fieldCycle,running,elapsed,beat,playingStep,nextPhraseBeat,phraseClock:phraseClock(),rings:scene().map(source=>({id:source.id,segments:ringSegments(source)})),pitch:{min:PITCH_MIN,max:PITCH_MAX,allowed:allowedNotes(),free:scale().mode==='free'},particles:particles.map(p=>({id:p.id,x:p.x,y:p.y,note:p.note,start:p.start,step:p.step,group:p.group})),hits:[...stats.hits],activeNotes:soundingAll().map(v=>({...v,name:v.channel===2?'перкуссия':noteName(v.note)})),audioState:sound.context?.state||'off',audioPeak:stats.peak,visualization:{enabled:showAudio,wavePeak:sound.peak,spectrumPeak:sound.spectrum?Math.max(...sound.spectrum):0}}),geometry:()=>({...geom,w,h}),audioSettings:()=>clone(mix())};
@@ -1755,7 +1780,7 @@
     cue(){chooseField(selectedFieldId);if(!running)q('[data-action="play"]').click();}
   });
   q('[data-action="performance-play"]').addEventListener('click',()=>q('[data-action="play"]').click());
-  const previousButton=q('[data-action="restore-previous"]');previousButton.hidden=!localStorage.getItem(STORAGE_KEY+'-before-performance');
-  previousButton.addEventListener('click',()=>{const previous=JSON.parse(localStorage.getItem(STORAGE_KEY+'-before-performance')||'null');if(!previous)return;remember();pause();restore(previous);resetAllTransport();commit();});
+  const previousButton=q('[data-action="restore-previous"]');previousButton.hidden=![STORAGE_KEY+'-before-demo',STORAGE_KEY+'-before-performance'].some(key=>localStorage.getItem(key));
+  previousButton.addEventListener('click',()=>{const previous=JSON.parse(localStorage.getItem(STORAGE_KEY+'-before-demo')||localStorage.getItem(STORAGE_KEY+'-before-performance')||'null');if(!previous)return;remember();pause();restore(previous);liveUI?.reset();resetAllTransport();commit();});
   reducedMotion.addEventListener('change',paint);openInspector('source');sync();setEditorView(new URLSearchParams(window.location.search).get('view')==='field'?'field':'composition');new ResizeObserver(()=>{resize();resizeRing();}).observe(stage);resize();requestAnimationFrame(frame);
 })();

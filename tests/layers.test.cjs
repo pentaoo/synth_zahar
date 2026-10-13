@@ -11,7 +11,9 @@ async function layered(performanceMode=false) {
     let fields=[],activeFieldId=1,queuedFieldId=null,sequenceEnabled=true,fieldCycle=0,selectedFieldId=1,fieldDrag=null,ignoreFieldClickUntil=0,renderedFields=null,renderedLayers=null;
     let elapsed=0,beat=0,nextPhraseBeat=0,lastTime=0,audioAnchor=0,wallAnchor=0,playingStepAt=null;
     let phraseEvents=[],particles=[],ripples=[],ghost=null,drag=null;
-    let liveEditorOpen=false,patternInsertion=null;const MAX_FIELDS=16,FALL_TIME=.8,stats={hits:[],peak:0},performance={now:()=>sound.context?.currentTime*1000||0};
+    let liveEditorOpen=false,patternInsertion=null,marquee=null,resettingPerformance=false;const liveUI={resets:0,reset(){this.resets++;}};
+    const STORAGE_KEY='test-score',storage=new Map(),localStorage={setItem:(key,value)=>storage.set(key,value),getItem:key=>storage.get(key)||null};
+    const MAX_FIELDS=16,FALL_TIME=.8,stats={hits:[],peak:0},performance={now:()=>sound.context?.currentTime*1000||0};
     const node={dataset:{},style:{},children:[],setAttribute(){},scrollIntoView(){}};
     const q=()=>node,all=()=>[],status=()=>{},openInspector=()=>{},sync=()=>{},syncFields=()=>{},syncPlayhead=()=>{},paint=()=>{},resize=()=>{},resizeRing=()=>{},requestAnimationFrame=()=>{};
     const root={dataset:{}},remember=()=>{},persist=()=>{},commit=()=>{};
@@ -23,6 +25,7 @@ async function layered(performanceMode=false) {
   between('  function generatePhraseBeats() {','  canvas.addEventListener(')+
   between('  function liveEditorModel() {','  function syncPerformance() {')+
   between('  function pause(){','  q(\'[data-action="play"]\').addEventListener')+`
+    const starterSnapshot=fieldSnapshot();
     phraseLength=2;bpm=160;scenes.space=[];
     const base=fieldSnapshot();
     const makeFields=(count,length)=>Array.from({length:count},(_,i)=>({id:i+1,name:'Фраза '+(i+1),repeats:1,snapshot:{...clone(base),phraseLength:length}}));
@@ -37,6 +40,8 @@ async function layered(performanceMode=false) {
       inspect(id,layerId){liveEditorOpen=true;inspectField(id,layerId);},model:liveEditorModel,edit:updateLivePhrase,insertPattern:insertPatternPhrase,
       preset(group,preset=0,append=false){const model=liveEditorModel(),result=phrasePresets.insert(model.snapshot,{group,preset,append,notes:notesForSnapshot(model.snapshot)},createLiveSource);updateLivePhrase(snapshot=>{snapshot.scenes.autumn=result.scenes.autumn;snapshot.nextId=result.nextId;snapshot.selectedId=result.selectedId;});},
       patch:()=>typeof performancePatch==='undefined'?null:clone(performancePatch),
+      setPatch(value){performancePatch=clone(value);},loadScore:loadPerformanceScore,restart:restartPerformance,
+      previous:()=>JSON.parse(storage.get(STORAGE_KEY+'-before-demo')||'null'),editorResets:()=>liveUI.resets,
       async reload(){const saved=serial();pause();restore(saved);resetAllTransport();await initializeLayers();},
       resume(){anchorClock();running=true;},
       mute(id){const layer=layers.find(item=>item.id===id);layer.muted=layer.engine.muted=true;withLayer(layer,()=>{sound.stop();sound.configure(undefined,false);});},
@@ -181,4 +186,41 @@ test('dropping a preset inserts a phrase between neighbors while both party cloc
  const after=c.state();assert.deepEqual(Array.from(after.layers[0].fields,field=>field.id),[1,2,5,3,4]);assert.equal(c.model().name,'Септаккорд');
  for(let i=0;i<2;i++){close(after.layers[i].elapsed,before.layers[i].elapsed);close(after.layers[i].beat,before.layers[i].beat);assert.equal(c.engines()[i].held.get(1).oscillator,notes[i]);}
  assert.equal(after.layers[0].active,1);require('../sketches/landscape/layout-files.js').validateSnapshot(c.serial());
+});
+
+test('each fresh start loads the authored score instead of the saved edited composition',async()=>{
+ const c=await layered(true);c.inspect(1,1);c.preset('melody',1);c.tempo(140);await c.add('drums');
+ const patch=c.patch();patch.voices[1].noise=.9;patch.drums.kick=0;c.setPatch(patch);
+ const edited=c.serial();await c.reload();assert.equal(c.state().layers.length,3);
+ c.loadScore();const fresh=c.serial();
+ assert.equal(c.state().running,false);assert.equal(fresh.layers.length,1);assert.equal(fresh.compositionTempo,96);assert.equal(fresh.cycleBeats,64);
+ assert.equal(fresh.sequenceEnabled,true);assert.equal(fresh.activeFieldId,1);
+ assert.deepEqual(Array.from(fresh.fields,field=>field.name),require('../sketches/landscape/performance-score.js').phrases.map(phrase=>phrase.name));
+ assert.deepEqual(JSON.parse(JSON.stringify(c.patch())),require('../sketches/landscape/performance-score.js').patchDefaults);
+ assert.equal(fresh.fields[0].snapshot.scaleSettings.autumn.tonic,2);assert.equal(fresh.fields[0].snapshot.scaleSettings.autumn.mode,'minor');
+ assert.notDeepEqual(JSON.parse(JSON.stringify(fresh.fields[0].snapshot.scenes)),JSON.parse(JSON.stringify(edited.fields[0].snapshot.scenes)));
+});
+test('restart restores the score during playback and reuses the audio output',async()=>{
+ const c=await layered(true);c.loadScore();await c.init();c.resume();c.tickTo(.91);
+ const old=c.engines()[0],context=old.context;c.inspect(1,1);c.preset('chords',1);c.tempo(135);await c.add('bass');
+ const patch=c.patch();patch.voices[0].wave='square';patch.drums.gain=0;patch.echo=.8;c.setPatch(patch);
+ const edited=c.serial();await c.restart();const reset=c.serial();
+ assert.equal(c.state().running,true);assert.equal(c.state().scope,'composition');assert.equal(reset.layers.length,1);
+ assert.equal(reset.fields.length,8);assert.equal(reset.compositionTempo,96);assert.equal(reset.activeFieldId,1);
+ assert.equal(c.state().layers[0].queued,null);close(c.state().layers[0].elapsed,0);close(c.state().layers[0].beat,0);
+ assert.equal(c.engines()[0].context,context);assert.equal(old.master.connections.length,0);
+ assert.equal(context.nodes.filter(node=>node.kind==='DynamicsCompressor').length,1);assert.equal(c.editorResets(),1);
+ assert.deepEqual(JSON.parse(JSON.stringify(c.patch())),require('../sketches/landscape/performance-score.js').patchDefaults);
+ assert.deepEqual(JSON.parse(JSON.stringify(c.previous().fields)),JSON.parse(JSON.stringify(edited.fields)));
+ c.tickTo(context.currentTime+.91);assert.ok(c.state().hits.some(hit=>hit.type==='leaf'));
+ c.inspect(1,1);c.preset('chords',2);assert.equal(c.state().running,true);
+});
+test('repeated paused restarts rebuild independent notes and recover an empty composition',async()=>{
+ const c=await layered(true);await c.restart();const original=JSON.parse(JSON.stringify(c.serial().fields));
+ c.pause();c.inspect(1,1);c.preset('melody',2);await c.restart();
+ assert.equal(c.state().running,false);assert.deepEqual(JSON.parse(JSON.stringify(c.serial().fields)),original);
+ c.remove(1);assert.equal(c.state().layers.length,0);await c.restart();
+ assert.equal(c.state().running,false);assert.equal(c.state().layers.length,1);assert.equal(c.serial().fields.length,8);
+ c.inspect(1,1);c.edit(snapshot=>{snapshot.scenes.autumn=[];});await c.restart();
+ assert.deepEqual(JSON.parse(JSON.stringify(c.serial().fields)),original);assert.equal(c.editorResets(),4);
 });
