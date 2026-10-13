@@ -809,6 +809,7 @@
         for(const name of ['number','preview','rhythm']){const span=document.createElement('span');span.className='phrase-'+name;label.append(span);}button.append(label);
         button.addEventListener('pointerdown',event=>beginFieldDrag(event,field.id,layer.id));
         button.addEventListener('click',event=>{if(performance.now()<ignoreFieldClickUntil)return;if(event.shiftKey)togglePhraseSelection(layer.id,field.id);else chooseField(field.id,layer.id);syncFields();});
+        button.addEventListener('dblclick',event=>{if(event.shiftKey||performance.now()<ignoreFieldClickUntil)return;event.preventDefault();editSelectedField();});
         button.addEventListener('keydown',event=>{
           if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='a'){event.preventDefault();selectedPhraseKeys=new Set(layers.flatMap(item=>item.fields.map(phrase=>phraseKey(item.id,phrase.id))));focusPhraseSelection();return;}
           if(['Delete','Backspace'].includes(event.key)){event.preventDefault();if(phraseBatch()&&selectedPhraseKeys.has(phraseKey(layer.id,field.id)))deletePhraseSelection();else{selectLayer(layer.id);deleteField(field.id);}}
