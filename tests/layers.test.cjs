@@ -3,23 +3,25 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {fixture,between}=require('./helpers/audio-fixture.cjs');
 
-async function layered() {
+async function layered(performanceMode=false) {
   const f=await fixture([0,1]);
+  if(performanceMode)f.evaluate(`let performancePatch=${JSON.stringify(require("../sketches/landscape/performance-score.js").patchDefaults)};const score=window.PerformanceScore;Object.assign(modes,{minor:{steps:[0,2,3,5,7,8,10]},major:{steps:[0,2,4,5,7,9,11]}});`);
   f.evaluate(`
     let sound=engine,layers=[],selectedLayerId=1,currentLayerId=1,compositionTempo=160,cycleBeats=8,editorView='composition',audioHost=null,pendingPersistence=false;
     let fields=[],activeFieldId=1,queuedFieldId=null,sequenceEnabled=true,fieldCycle=0,selectedFieldId=1,fieldDrag=null,ignoreFieldClickUntil=0,renderedFields=null,renderedLayers=null;
     let elapsed=0,beat=0,nextPhraseBeat=0,lastTime=0,audioAnchor=0,wallAnchor=0,playingStepAt=null;
     let phraseEvents=[],particles=[],ripples=[],ghost=null,drag=null;
-    const MAX_FIELDS=8,FALL_TIME=.8,stats={hits:[],peak:0},performance={now:()=>sound.context?.currentTime*1000||0};
+    let liveEditorOpen=false;const MAX_FIELDS=16,FALL_TIME=.8,stats={hits:[],peak:0},performance={now:()=>sound.context?.currentTime*1000||0};
     const node={dataset:{},style:{},children:[],setAttribute(){},scrollIntoView(){}};
-    const q=()=>node,all=()=>[],status=()=>{},sync=()=>{},syncFields=()=>{},syncPlayhead=()=>{},paint=()=>{},resize=()=>{},resizeRing=()=>{},requestAnimationFrame=()=>{};
+    const q=()=>node,all=()=>[],status=()=>{},openInspector=()=>{},sync=()=>{},syncFields=()=>{},syncPlayhead=()=>{},paint=()=>{},resize=()=>{},resizeRing=()=>{},requestAnimationFrame=()=>{};
     const root={dataset:{}},remember=()=>{},persist=()=>{},commit=()=>{};
   `+between('  const activeField =','  function persist() {')+
   between('  function restore(saved) {','  const starterSnapshot=')+
-  between('  function setEditorView(view) {','  function resizeRing() {')+
+  between('  function syncViewControls() {','  function resizeRing() {')+
   between('  function nextFieldId() {','  function syncFields() {')+
   between('  function anchorClock(){','  function addSource(')+
   between('  function generatePhraseBeats() {','  canvas.addEventListener(')+
+  between('  function liveEditorModel() {','  function syncPerformance() {')+
   between('  function pause(){','  q(\'[data-action="play"]\').addEventListener')+`
     phraseLength=2;bpm=160;scenes.space=[];
     const base=fieldSnapshot();
@@ -31,7 +33,9 @@ async function layered() {
       init:initializeLayers,
       advance(time){audioHost.context.advance(time);frame(time*1000);},
       state:()=>{storeCurrentLayer();return {tempo:compositionTempo,scope:editorView,running,selectedLayerId,layers:layers.map(layer=>({id:layer.id,active:layer.context.activeFieldId,queued:layer.context.queuedFieldId,beat:layer.context.beat,elapsed:layer.context.elapsed,fields:clone(layer.fields)})),hits:clone(stats.hits)};},
-      engines:()=>layers.map(layer=>layer.engine),choose:chooseField,select:selectLayer,tempo:setCompositionTempo,scope:setEditorView,pause,serial,remove:removeLayer,add:addLayer,
+      engines:()=>layers.map(layer=>layer.engine),choose:chooseField,select:selectLayer,tempo:setCompositionTempo,scope:setEditorView,pause,serial,remove:removeLayer,add:addLayer,addField,reorder:reorderField,
+      inspect(id,layerId){liveEditorOpen=true;inspectField(id,layerId);},model:liveEditorModel,edit:updateLivePhrase,
+      patch:()=>typeof performancePatch==='undefined'?null:clone(performancePatch),
       async reload(){const saved=serial();pause();restore(saved);resetAllTransport();await initializeLayers();},
       resume(){anchorClock();running=true;},
       mute(id){const layer=layers.find(item=>item.id===id);layer.muted=layer.engine.muted=true;withLayer(layer,()=>{sound.stop();sound.configure(undefined,false);});},
@@ -119,4 +123,47 @@ test('deleting the final ring stops playback, survives restore and allows a new 
   assert.equal(saved.layers.length,1);assert.equal(saved.selectedLayerId,1);assert.equal(saved.layers[0].kind,'bass');
   assert.equal(c.engines()[0].context,context);assert.equal(context.nodes.filter(node=>node.kind==='DynamicsCompressor').length,1);
   require('../sketches/landscape/layout-files.js').validateSnapshot(saved);
+});
+
+test('adding a party during playback leaves existing clocks and held notes uninterrupted',async()=>{
+  const c=await layered();c.tickTo(.91);const before=c.state(),[outer,inner]=c.engines();
+  const notes=[outer.held.get(1).oscillator,inner.held.get(1).oscillator];
+  await c.add('drums');const after=c.state();assert.equal(after.running,true);assert.equal(after.layers.length,3);
+  for(let i=0;i<2;i++){close(after.layers[i].elapsed,before.layers[i].elapsed);close(after.layers[i].beat,before.layers[i].beat);assert.equal(c.engines()[i].held.get(1).oscillator,notes[i]);}
+  assert.equal(c.engines()[2].context,outer.context);c.tickTo(1.81);
+  assert.ok(c.state().hits.some(hit=>hit.layerId===3));assert.ok(c.state().hits.some(hit=>hit.layerId===1&&hit.audioAt>.91));
+});
+test('new phrases are selected for live editing and the ninth phrase saves and imports',async()=>{
+  const c=await layered(true);c.tickTo(.91);const before=c.state().layers[0],note=c.engines()[0].held.get(1).oscillator;
+  for(let i=0;i<5;i++)c.addField();const after=c.state();
+  assert.equal(after.layers[0].fields.length,9);close(after.layers[0].elapsed,before.elapsed);close(after.layers[0].beat,before.beat);
+  assert.equal(c.engines()[0].held.get(1).oscillator,note);assert.equal(c.model().name,'Фраза 9');assert.equal(c.model().playing,false);
+  const files=require('../sketches/landscape/layout-files.js'),saved=files.decode(files.encode(c.serial(),'Девять фраз')).snapshot;
+  assert.equal(saved.layers[0].fields.length,9);
+  while(c.state().layers[0].fields.length<16)c.addField();c.addField();assert.equal(c.state().layers[0].fields.length,16);
+});
+test('editing an inactive phrase changes only its data, then a cue plays it on the next beat',async()=>{
+  const c=await layered(true);c.tickTo(.91);const before=c.state(),notes=c.engines().map(engine=>engine.held.get(1).oscillator);
+  c.inspect(3,1);c.edit(snapshot=>{snapshot.scenes.autumn[0].x=.25;snapshot.scenes.autumn[0].steps=[0];});
+  const after=c.state();assert.equal(after.running,true);assert.equal(after.layers[0].active,1);
+  for(let i=0;i<2;i++){close(after.layers[i].elapsed,before.layers[i].elapsed);assert.equal(c.engines()[i].held.get(1).oscillator,notes[i]);}
+  assert.equal(after.layers[0].fields[2].snapshot.scenes.autumn[0].x,.25);
+  c.choose(3,1);c.tickTo(1.21);assert.equal(c.state().layers[0].active,3);assert.equal(c.state().layers[1].active,1);
+});
+test('live deletion silences only the selected source and preserves the other party clock',async()=>{
+  const c=await layered(true);c.tickTo(.91);c.inspect(1,1);const before=c.state(),other=c.engines()[1].held.get(1).oscillator;
+  c.edit(snapshot=>{snapshot.scenes.autumn=[];});const after=c.state();
+  assert.equal(after.running,true);close(after.layers[0].elapsed,before.layers[0].elapsed);close(after.layers[1].elapsed,before.layers[1].elapsed);
+  assert.equal(c.engines()[0].held.size,0);assert.equal(c.engines()[1].held.get(1).oscillator,other);
+  assert.equal(c.serial().layers[0].fields[0].snapshot.scenes.autumn.length,0);
+});
+
+test('a live beat edit cancels a strike in the audio lookahead without stopping other voices',async()=>{
+ const c=await layered(true);c.tickTo(.91);c.inspect(1,1);
+ c.edit(snapshot=>{snapshot.scenes.autumn.push({...structuredClone(snapshot.scenes.autumn[0]),id:2,type:'drop',steps:[1],sound:{...snapshot.scenes.autumn[0].sound,channel:'0',instrument:'wave-sine',wave:'sine'}});snapshot.nextId=3;});
+ c.tickTo(1.16);const engine=c.engines()[0],pending=[...engine.voices.values()].find(voice=>voice.id===2),otherCount=c.engines()[1].active.size,otherClock=c.state().layers[1].elapsed;
+ assert.ok(pending&&pending.start>engine.context.currentTime,'the next strike was already prepared');
+ c.edit(snapshot=>{snapshot.scenes.autumn.find(source=>source.id===2).steps=[];});
+ assert.ok(![...engine.voices.values()].some(voice=>voice.id===2));assert.equal(c.engines()[1].active.size,otherCount);close(c.state().layers[1].elapsed,otherClock);
+ c.tickTo(1.21);assert.ok(!c.state().hits.some(hit=>hit.layerId===1&&hit.id===2));assert.equal(c.state().running,true);
 });

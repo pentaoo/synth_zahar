@@ -5,10 +5,10 @@
   const MAX_BYTES = 1024 * 1024;
   const VERSIONS = [1, 2, 3, 4, 5, 6, 7];
   const TYPES = {autumn:['drop','leaf','raven','fog'],space:['comet','star','asteroid','aurora']};
-  const WAVES = ['sine','triangle','sawtooth','square'];
+  const WAVES = ['sine','triangle','sawtooth','square','noise'];
   const instruments = typeof module!=='undefined'&&module.exports ? require('./instruments.js') : window.LandscapeInstruments;
   const MODES = ['major','minor','dorian','phrygian','lydian','mixolydian','locrian','majorPent','minorPent','chromatic','free'];
-  const SOURCE_RANGES = {gain:[0,1.5],pan:[-1,1],octave:[-2,2],detune:[-50,50],duration:[.08,2],attack:[.002,1],decay:[.02,1],sustain:[0,1],release:[.03,2],brightness:[300,12000]};
+  const SOURCE_RANGES = {gain:[0,1.5],pan:[-1,1],octave:[-2,2],detune:[-50,50],duration:[.08,2],attack:[.002,1],decay:[.02,1],sustain:[0,1],release:[.03,2],brightness:[300,12000],noise:[0,1],fm:[0,5],harmonicity:[.5,8],sub:[0,1],vibrato:[0,100],motion:[0,1],lfoRate:[.1,12],pulse:[0,1],drive:[0,1]};
   const FX_RANGES = {brightness:[300,12000],drive:[0,1],delayMix:[0,.8],delayTime:[.04,1],feedback:[0,.75],reverbMix:[0,.8],room:[.4,4]};
   const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
   const copy = value => JSON.parse(JSON.stringify(value));
@@ -20,6 +20,11 @@
   }
   function validateSnapshot(snapshot) {
     if(!record(snapshot)||!VERSIONS.includes(snapshot.version)||!Object.hasOwn(TYPES,snapshot.worldKey)||!record(snapshot.scenes))invalid();
+    if(snapshot.performancePatch!==undefined){
+      const patch=snapshot.performancePatch;if(!record(patch)||['drive','echo','space','swing','master'].some(key=>!Object.hasOwn(patch,key)))invalid('Неполная панель синтеза.');ranges(patch,{drive:[0,1],echo:[0,.8],space:[0,.8],swing:[0,.5],master:[0,.8]});
+      if(!number(patch.selectedVoice,0,1,true)||!Array.isArray(patch.voices)||patch.voices.length!==2)invalid('Повреждена панель синтеза.');
+      for(const voice of patch.voices){if(!record(voice)||['wave','noise','brightness','fm','harmonicity','detune','motion','lfoRate','attack','release'].some(key=>!Object.hasOwn(voice,key)))invalid('Неполные настройки синта.');ranges(voice,{noise:[0,1],brightness:[300,12000],fm:[0,5],harmonicity:[.5,8],detune:[0,50],motion:[0,1],lfoRate:[.1,12],attack:[.002,1],release:[.03,2]});if(!WAVES.includes(voice.wave))invalid('Неизвестная волна синта.');}
+    }
     if(snapshot.version===7) {
       if(!Array.isArray(snapshot.layers)||snapshot.layers.length>4)invalid('В композиции может быть до 4 слоёв.');
       if(!number(snapshot.compositionTempo,45,160,true)||!number(snapshot.cycleBeats,1,128,true))invalid('Повреждены темп или длина оборота.');
@@ -33,7 +38,7 @@
       else if(snapshot.selectedLayerId!==null||snapshot.activeFieldId!==null||snapshot.selectedId!==null||!Array.isArray(snapshot.fields)||snapshot.fields.length||Object.values(snapshot.scenes).some(sources=>!Array.isArray(sources)||sources.length)||typeof snapshot.sequenceEnabled!=='boolean')invalid('Повреждена пустая композиция.');
     }
     if(snapshot.version===6) {
-      if(!Array.isArray(snapshot.fields)||snapshot.fields.length<1||snapshot.fields.length>8)invalid('В композиции должно быть от 1 до 8 полей.');
+      if(!Array.isArray(snapshot.fields)||snapshot.fields.length<1||snapshot.fields.length>16)invalid('В слое должно быть от 1 до 16 фраз.');
       const fieldIds=new Set();
       for(const field of snapshot.fields) {
         if(!record(field)||!number(field.id,1,Number.MAX_SAFE_INTEGER-32,true)||fieldIds.has(field.id))invalid('Повреждён список полей.');
@@ -65,7 +70,7 @@
           if('instrument' in source.sound&&source.sound.instrument!=='default'&&!instruments.get(source.sound.instrument))invalid('Неизвестный инструмент.');
           if('wave' in source.sound&&!['auto',...WAVES].includes(source.sound.wave))invalid('Неизвестная форма волны источника.');
           const preset=instruments.get(source.sound.instrument);
-          if(preset&&instruments.typeFor(preset,world)!==source.type)invalid('Инструмент не соответствует предмету.');
+          if(preset&&preset.category!=='waves'&&instruments.typeFor(preset,world)!==source.type)invalid('Инструмент не соответствует предмету.');
         }
       }
       const scale=snapshot.scaleSettings?.[world];
@@ -74,7 +79,7 @@
       if(waves!==undefined&&(!Array.isArray(waves)||waves.length!==2||waves.some(wave=>!WAVES.includes(wave))))invalid('Неизвестная форма волны.');
       const mix=snapshot.soundSettings?.[world];
       if(mix!==undefined) {
-        ranges(mix,{master:[0,.8],threshold:[-40,0],ratio:[1,12]});
+        ranges(mix,{master:[0,.8],threshold:[-40,0],ratio:[1,12],swing:[0,.5]});
         if(mix.voices!==undefined) {
           if(!Array.isArray(mix.voices)||mix.voices.length!==2)invalid('В раскладке должны быть два синта.');
           mix.voices.forEach(voice=>ranges(voice,{gain:[0,1.5],pan:[-1,1],detune:[-50,50]}));

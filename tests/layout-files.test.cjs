@@ -35,7 +35,7 @@ test('invalid files are rejected without changing the supplied composition',()=>
  assert.throws(()=>files.decode(JSON.stringify({format:files.FORMAT,formatVersion:2,state:original})));
 });
 test('malformed sources, duplicate IDs and unsafe audio parameters are rejected',()=>{
- const variants=[s=>s.scenes.autumn[0].steps=[-1],s=>s.scenes.autumn[0].steps=[32],s=>s.scenes.autumn[0].x=1.1,s=>s.scenes.space[0].id=1,s=>s.scenes.space[0].type='fog',s=>s.scenes.autumn[0].sound.attack=-1,s=>s.soundSettings.autumn.effects.synth.feedback=2,s=>s.soundSettings.autumn.voices=null,s=>s.waveforms.autumn=['noise','sine']];
+ const variants=[s=>s.scenes.autumn[0].steps=[-1],s=>s.scenes.autumn[0].steps=[32],s=>s.scenes.autumn[0].x=1.1,s=>s.scenes.space[0].id=1,s=>s.scenes.space[0].type='fog',s=>s.scenes.autumn[0].sound.attack=-1,s=>s.soundSettings.autumn.effects.synth.feedback=2,s=>s.soundSettings.autumn.voices=null,s=>s.waveforms.autumn=['missing','sine']];
  for(const mutate of variants){const state=snapshot();mutate(state);assert.throws(()=>files.decode(JSON.stringify(state)));}
 });
 test('large files are rejected and filenames cannot include directory separators',()=>{

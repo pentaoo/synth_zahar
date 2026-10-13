@@ -34,7 +34,7 @@
     return `M ${trimmed(g.outerStart,start,-startCorner)} Q ${print(g.outerStart)} ${p(outer,outerStart+startCorner/outer)} A ${outer} ${outer} 0 ${largeOuter} 1 ${p(outer,outerEnd-endCorner/outer)} Q ${print(g.outerEnd)} ${trimmed(g.outerEnd,end,-endCorner)}${options.notchEnd?notch(end,-1,1):''} L ${trimmed(g.innerEnd,end,endCorner)} Q ${print(g.innerEnd)} ${p(inner,innerEnd-endCorner/inner)} A ${inner} ${inner} 0 ${largeInner} 0 ${p(inner,innerStart+startCorner/inner)} Q ${print(g.innerStart)} ${trimmed(g.innerStart,start,startCorner)}${options.notchStart?notch(start,1,-1):''} Z`;
   }
   function addButtonRadius({outer,inner}) {
-    return Math.min(56,(outer-inner)*.29);
+    return Math.min(26,(outer-inner)*.15);
   }
   function slotAtPoint(x, y, count) {
     if (!count || Math.hypot(x,y) < .01) return null;
@@ -51,7 +51,7 @@
   function demoSnapshot(base, variant) {
     const result = copy(base), palettes = [[48,55,60,64],[50,57,62,65],[53,60,65,69],[55,62,67,71]];
     const notes = palettes[variant % palettes.length], shift = Math.floor(variant / 4) % 3 * 2;
-    const source = (id,type,note,y,steps,sound={}) => ({id,type,x:(note-48)/24,y,steps,muted:false,sound:{gain:1,pan:0,octave:0,detune:0,duration:.16,attack:.01,decay:.14,sustain:.3,release:.22,brightness:4200,channel:'auto',...sound}});
+    const source = (id,type,note,y,steps,sound={}) => ({id,type,x:(note-48)/24,y,steps,muted:false,sound:{gain:1,pan:0,octave:0,detune:0,duration:.16,attack:.01,decay:.14,sustain:.3,release:.22,brightness:4200,channel:type==='drop'?'0':type==='raven'?'2':'1',instrument:type==='raven'?'kick-deep':type==='drop'?'wave-sine':'wave-triangle',wave:type==='drop'?'sine':type==='raven'?'auto':'triangle',noise:0,...sound}});
     const patterns = [[0,4],[0,2,4,6],[0,1,3,4,5,7],[0,3,6]];
     result.worldKey='autumn';result.bpm=96;result.phraseLength=8;result.selectedId=1;result.tool='drop';result.nextId=6;
     result.scaleSettings.autumn={tonic:0,mode:'major'};
@@ -77,18 +77,18 @@
     return length*repeats*fieldCount*tempo/(cycleBeats*60);
   }
   function partFields(base,kind,count=kind==='bass'?3:4,offset=0) {
-    const voice=(source,id,changes={})=>{const preset=instruments.get(id);return {...source,...changes,type:preset.type,sound:{...source.sound,...preset.settings,instrument:id,channel:'auto',pan:0}};};
+    const voice=(source,id,changes={})=>{const preset=instruments.get(id);return {...source,...changes,type:preset.type,sound:{...source.sound,...preset.settings,instrument:id,channel:preset.category==='waves'?(kind==='melody'?'1':'0'):'auto',pan:0}};};
     return demoFields(base,count,offset).map((field,localIndex)=>{
       const index=localIndex+offset;
       const snapshot=field.snapshot,sources=snapshot.scenes.autumn;
       if(kind==='bass') {
-        snapshot.scenes.autumn=[voice(sources[0],['bass-sub','bass-round','bass-pluck'][index%3],{x:[0,5/24,7/24][index%3],y:.42,steps:[0,3,6]})];
+        snapshot.scenes.autumn=[voice(sources[0],['wave-sine','wave-triangle','wave-square'][index%3],{x:[0,5/24,7/24][index%3],y:.42,steps:[0,3,6]})];
         snapshot.waveforms.autumn=['triangle','sine'];
-      }else if(kind==='melody')snapshot.scenes.autumn=[voice(sources[0],index%2?'melody-kalimba':'melody-keys'),voice(sources[1],index%2?'melody-glass':'melody-pluck')];
+      }else if(kind==='melody')snapshot.scenes.autumn=[voice(sources[0],index%2?'wave-triangle':'wave-sine'),voice(sources[1],index%2?'wave-square':'wave-sawtooth')];
       else if(kind==='drums')snapshot.scenes.autumn=[
-        voice(sources[2],index%2?'kick-punch':'kick-deep',{steps:[[0,4],[0,2,4,6],[0,3,4,6],[0,2,3,6]][index%4],y:.4}),
-        voice(sources[2],index%2?'snare-dust':'snare-dry',{id:5,x:0,y:.32,steps:[2,6]}),
-        voice(sources[2],index%2?'hat-pedal':'hat-closed',{id:6,x:0,y:.22,steps:[0,1,2,3,4,5,6,7]})
+        voice(sources[2],'kick-deep',{steps:[[0,4],[0,2,4,6],[0,3,4,6],[0,2,3,6]][index%4],y:.4}),
+        voice(sources[2],'snare-dry',{id:5,x:0,y:.32,steps:[2,6]}),
+        voice(sources[2],'hat-closed',{id:6,x:0,y:.22,steps:[0,1,2,3,4,5,6,7]})
       ];
       snapshot.nextId=Math.max(snapshot.nextId,...snapshot.scenes.autumn.map(source=>source.id+1));
       snapshot.tool=snapshot.scenes.autumn[0]?.type || 'drop';snapshot.toolInstrument=snapshot.scenes.autumn[0]?.sound.instrument || 'default';

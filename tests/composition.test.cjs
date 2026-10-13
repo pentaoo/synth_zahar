@@ -12,7 +12,7 @@ async function composition(repeats=2) {
     let phraseEvents=[],particles=[],ripples=[],ghost=null,drag=null;
     const stats={hits:[],peak:0},performance={now:()=>engine.context.currentTime*1000};
     const node={dataset:{},children:[],setAttribute(){},scrollIntoView(){}};
-    const q=()=>node,status=()=>{},sync=()=>{},syncFields=()=>{},syncPlayhead=()=>{},paint=()=>{},requestAnimationFrame=()=>{};
+    const q=()=>node,status=()=>{},openInspector=()=>{},sync=()=>{},syncFields=()=>{},syncPlayhead=()=>{},paint=()=>{},requestAnimationFrame=()=>{};
     const remember=()=>{},persist=()=>{},commit=()=>{};
   `+between('  const activeField =','  function persist() {')+
   between('  function nextFieldId() {','  function syncFields() {')+
@@ -29,6 +29,7 @@ async function composition(repeats=2) {
       choose:chooseField,move:moveField,pause,
       resume(){anchorClock();running=true;sound.syncHeld();},
       sequence(value){sequenceEnabled=value;},serial,
+      swing(value){soundSettings.autumn.swing=value;scene()[0].steps=[0,1];},
       single(){fields=fields.slice(0,1);},
       held(){scene()[0].type='fog';fields.forEach(field=>field.snapshot.scenes.autumn[0].type='fog');},
     };
@@ -89,4 +90,12 @@ test('pausing during a scheduled transition stops both the retiring and destinat
   const previous=engine.held.get(1).oscillator;c.tickTo(1.52);
   const destination=engine.held.get(1).oscillator;c.pause();
   close(previous.stopAt,1.52);close(destination.stopAt,1.52);assert.equal(engine.active.size,0);
+});
+
+test('swing delays odd beats, leaves pair boundaries fixed and starts same-beat sources together',async()=>{
+  const {c}=await composition(8);c.sequence(false);c.swing(.5);c.tickTo(2.4);
+  const hits=c.state().hits;
+  const odd=hits.find(hit=>hit.step===1);close(odd.audioAt,1.3625);
+  const even=hits.filter(hit=>hit.step===0);close(even[1].audioAt,1.55);
+  close(even[2].audioAt,2.3);
 });

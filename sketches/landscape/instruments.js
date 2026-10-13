@@ -1,12 +1,12 @@
 /* Local Web Audio recipes: no samples, downloads or extra audio channels. */
 (() => {
   'use strict';
-  const categories = {drums:'Барабаны',bass:'Бас',melody:'Мелодия'};
+  const categories = {waves:'Волны',drums:'Барабаны'};
   const tone = (frequency, endFrequency, decay, level=1, wave='sine', delay=0) => ({frequency,endFrequency,decay,level,wave,delay});
   const noise = (filter, frequency, decay, level=1, delay=0, q=.7) => ({noise:true,filter,frequency,decay,level,delay,q});
-  const drum = (id,name,texture,components,duration=.18) => ({id,category:'drums',name,texture,type:'raven',channel:2,components,settings:{duration,attack:.002,decay:.08,sustain:0,release:.03,brightness:12000,wave:'auto'}});
+  const drum = (id,name,texture,components,duration=.18) => ({id,category:'drums',name,texture,type:'raven',channel:2,components,settings:{duration,attack:.002,decay:.08,sustain:0,release:.03,brightness:12000,wave:'auto',noise:1}});
   const synth = (id,category,name,texture,wave,settings={},partials=[],fm=null) => ({id,category,name,texture,type:category==='bass'?'drop':'leaf',channel:category==='bass'?0:1,partials,fm,settings:{wave,octave:category==='bass'?-2:0,duration:.16,attack:.006,decay:.2,sustain:.2,release:.2,brightness:5000,...settings}});
-  const catalog = [
+  const legacyCatalog = [
     drum('kick-deep','Бочка · саб','Глубокая, длинная',[tone(145,43,.48),noise('lowpass',1400,.012,.14)],.36),
     drum('kick-punch','Бочка · панч','Плотная, с щелчком',[tone(190,56,.22),noise('highpass',2600,.016,.32)]),
     drum('kick-soft','Бочка · мягкая','Тёплая, приглушённая',[tone(88,48,.28,.85),noise('lowpass',700,.026,.12)],.24),
@@ -43,12 +43,27 @@
     {...synth('melody-pad','melody','Туман','Непрерывный мягкий слой','triangle',{attack:.3,decay:.3,sustain:.65,release:.7,brightness:1800},[{ratio:1,level:.6,detune:-4},{ratio:1,level:.4,detune:4}]),type:'fog',sustained:true}
   ];
   // A small pitch scoop gives the rubber bass its elastic attack.
-  const rubber = catalog.find(preset=>preset.id==='bass-rubber');
+  const rubber = legacyCatalog.find(preset=>preset.id==='bass-rubber');
   rubber.partials=[{ratio:1,level:1,scoop:1.8}];
-  const byId = new Map(catalog.map(preset=>[preset.id,preset]));
+  const waveNames = {sine:'Синус',triangle:'Треугольник',sawtooth:'Пила',square:'Квадрат',noise:'Белый шум'};
+  const textures = {sine:'Чистый тон',triangle:'Мягкие гармоники',sawtooth:'Яркие гармоники',square:'Полый электронный тон',noise:'Шорох и воздух'};
+  const waves = Object.keys(waveNames).map(wave=>({id:'wave-'+wave,category:'waves',name:waveNames[wave],texture:textures[wave],type:'drop',channel:0,partials:[],settings:{wave,noise:0,octave:0,duration:.16,attack:.006,decay:.18,sustain:.35,release:.2,brightness:6000,detune:0}}));
+  const catalog = [...waves,...['kick-deep','snare-dry','hat-closed'].map(id=>legacyCatalog.find(preset=>preset.id===id))];
+  // Existing personal layouts keep their old recipes; only the small catalog is shown.
+  const byId = new Map([...legacyCatalog,...catalog].map(preset=>[preset.id,preset]));
+  const motionDefaults={fm:0,harmonicity:2,sub:0,vibrato:0,motion:0,lfoRate:3,pulse:0,drive:0};
+  const soundPresets = [
+    {id:'clean',name:'Чистый',settings:{wave:'sine',noise:0,detune:0,attack:.006,decay:.18,sustain:.7,release:.2,brightness:6000}},
+    {id:'pluck',name:'Щипок',settings:{wave:'triangle',noise:0,detune:0,attack:.002,decay:.12,sustain:.03,release:.09,brightness:4200}},
+    {id:'float',name:'Плывущий',settings:{wave:'sawtooth',noise:.03,detune:9,attack:.3,decay:.3,sustain:.65,release:.7,brightness:2200}},
+    {id:'rough',name:'Шершавый',settings:{wave:'square',noise:.22,detune:4,attack:.006,decay:.16,sustain:.45,release:.2,brightness:3800,drive:.4}},
+    {id:'metal',name:'Металл',settings:{wave:'sine',noise:0,detune:3,attack:.002,decay:.32,sustain:.14,release:.4,brightness:8000,fm:1.6,harmonicity:2.76}},
+    {id:'pulse',name:'Пульс',settings:{wave:'sawtooth',noise:.04,detune:7,attack:.01,decay:.15,sustain:.55,release:.2,brightness:2400,sub:.3,motion:.7,pulse:.45,lfoRate:3.2,drive:.18}}
+  ];
+  soundPresets.forEach(preset=>preset.settings={...motionDefaults,...preset.settings});
   const get = id => byId.get(id) || null;
   const forCategory = category => catalog.filter(preset=>preset.category===category);
   const typeFor = (preset,world='autumn') => world==='space'?({drop:'comet',leaf:'star',raven:'asteroid',fog:'aurora'}[preset.type]):preset.type;
-  const api = {catalog,categories,get,forCategory,typeFor};
+  const api = {catalog,categories,get,forCategory,typeFor,soundPresets,waveNames};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else window.LandscapeInstruments=api;
 })();

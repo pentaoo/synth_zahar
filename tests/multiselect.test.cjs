@@ -23,6 +23,8 @@ async function editor(){
     sources(ids){selectSources(ids);},
     batch(){editorView='composition';selectedPhraseKeys=new Set(['1:2','2:1']);compositionSourceFilter='type:leaf';},
     state:serial,history:()=>history.length,
+    inspect:inspectField,
+    filter(value){compositionSourceFilter=value;},
     undo(){restore(history.pop());},
     missingCounter(){delete layers[0].fields[1].snapshot.nextId;},
     allPhrases(){editorView='composition';selectedPhraseKeys=new Set(layers.flatMap(layer=>layer.fields.map(field=>phraseKey(layer.id,field.id))));},
@@ -92,4 +94,12 @@ test('copying an inactive imported phrase without a source counter creates valid
  const e=await editor();e.missingCounter();e.batch();e.copy();const state=e.state(),items=sources(state,1,2);
  assert.equal(items.length,4);assert.equal(new Set(items.map(item=>item.id)).size,4);assert.ok(Number.isSafeInteger(items[3].id));
  require('../sketches/landscape/layout-files.js').validateSnapshot(state);
+});
+
+test('a single selected inactive phrase edits only its chosen sources without cueing playback',async()=>{
+ const e=await editor();const before=e.state();e.phrases(['1:1']);e.inspect(2,1);e.filter('type:leaf');e.param('noise',.47);
+ assert.equal(sources(e.state(),1,2)[1].sound.noise,.47);
+ assert.deepEqual(sources(e.state(),1,1),sources(before,1,1));
+ assert.deepEqual(sources(e.state(),1,2)[0],sources(before,1,2)[0]);
+ assert.deepEqual(Array.from(e.clocks(),clock=>({...clock})),[{active:1,queued:null},{active:1,queued:null}]);
 });

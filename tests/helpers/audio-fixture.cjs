@@ -42,13 +42,13 @@ for(const kind of ['Gain','DynamicsCompressor','Analyser','BiquadFilter','WaveSh
   AudioContext.prototype['create'+kind]=function(){const node=new AudioNode(kind);this.nodes.push(node);return node;};
 }
 async function fixture(steps) {
-  const context=vm.createContext({window:{AudioContext,LandscapeInstruments:require('../../sketches/landscape/instruments.js'),LandscapeFiles:require('../../sketches/landscape/layout-files.js'),CompositionTools:require('../../sketches/landscape/composition-tools.js'),SelectionTools:require('../../sketches/landscape/selection-tools.js')},Float32Array,Uint8Array,console});
+  const context=vm.createContext({window:{AudioContext,PerformanceScore:require('../../sketches/landscape/performance-score.js'),LandscapeInstruments:require('../../sketches/landscape/instruments.js'),LandscapeFiles:require('../../sketches/landscape/layout-files.js'),CompositionTools:require('../../sketches/landscape/composition-tools.js'),SelectionTools:require('../../sketches/landscape/selection-tools.js')},Float32Array,Uint8Array,console});
   vm.runInContext(`
     const layoutFiles=window.LandscapeFiles,compositionTools=window.CompositionTools,instruments=window.LandscapeInstruments,selectionTools=window.SelectionTools;let layoutName='',toolInstrument='default';
     let selectedSourceIds=new Set([1]),selectedPhraseKeys=new Set(),phraseSelectionCleared=false,compositionSourceFilter='all';
     const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
     const PITCH_MIN=48,PITCH_SPAN=24,MAX_SOURCES=16;
-    let phraseLength=8,playingStep=null,running=true,activatedHeld=new Set(),worldKey='autumn',selectedId=1,tool='fog',bpm=80,nextId=2,showAudio=false;
+    let phraseLength=8,playingStep=null,running=true,activatedHeld=new Set(),worldKey='autumn',selectedId=1,tool='fog',bpm=80,nextId=2,showAudio=true;
     let scaleSettings={autumn:{tonic:0,mode:'majorPent'},space:{tonic:0,mode:'minorPent'}};
     const modes={majorPent:{},minorPent:{}};
     const frequencyFor=n=>440*Math.pow(2,(n-69)/12),noteFor=x=>48+x*24,snapX=x=>x;
