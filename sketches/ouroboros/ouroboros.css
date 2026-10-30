@@ -78,15 +78,12 @@ dialog p{font:var(--type-body);color:#000}
 dialog .routing{font:var(--type-caption)}
 details{margin:20px 0;font:var(--type-caption)}
 summary{cursor:pointer}
-dialog .shortcuts{font:var(--type-caption)}
 @media(max-width:850px){.channel-panel{bottom:40px;width:290px;left:28px}}
 @media(max-width:600px){.channel-panel{bottom:30px;width:min(280px,70vw);max-height:calc(100dvh - 250px)}dialog{padding:40px 26px}fieldset{margin-bottom:16px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 
 .spell-line[hidden]{display:none}
 [data-view="focus"] .spell-lexicon{display:none}
-.rune-help{font:var(--type-micro);margin:0 0 12px}
-[data-mobile="true"] .rune-help{display:none}
 .stage[data-hover="rune"] #canvas{cursor:pointer}
 .channel-panel{padding:8px 10px 12px 8px}
 .voice-panel{z-index:6;background:#fff}
@@ -111,3 +108,10 @@ dialog .shortcuts{font:var(--type-caption)}
 .spell-log p span{display:block}
 /* Desktop: nothing is written on the left; what was said goes to the log. */
 [data-mobile="false"] #spell-feedback{display:none}
+/* Desktop: the list of every command, under the line while it has focus. */
+.command-list{display:none}
+[data-mobile="false"] .spell-line:focus-within .command-list:not(:empty){display:block;background:#fff;padding:12px 0 16px}
+.command-group{display:flex;flex-wrap:wrap;gap:0 12px;align-items:baseline;font:var(--type-caption)}
+.command-group+.command-group{margin-top:6px}
+.command-group span{flex:0 0 100%;font:var(--type-micro);margin-bottom:2px}
+.command-group button{padding:3px 0;font:var(--type-caption)}

@@ -13,6 +13,7 @@ import {shortcut} from './input-shortcuts.mjs?v=chains-2';
 import {ViewState,Finale} from './view-state.mjs?v=chains-2';
 import {InkMass} from './ink-physics.mjs?v=chains-2';
 import {Typewriter} from './invitations.mjs?v=chains-2';
+import {commandGroups} from './commands.mjs?v=chains-1';
 import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-11';
 
 const $=id=>document.getElementById(id),root=$('ouroboros'),stage=$('stage'),canvas=$('canvas'),inkButton=$('ink'),probe=$('audio-state'),panel=$('channel-panel'),minimap=$('minimap'),dialog=$('sound-dialog');
@@ -46,7 +47,7 @@ root.dataset.modality='pointer';
 // Only real keyboard navigation shows focus rings; Escape and typing do not.
 window.addEventListener('pointerdown',()=>{root.dataset.modality='pointer';},true);
 window.addEventListener('keydown',event=>{root.dataset.modality=event.key==='Tab'?'keyboard':root.dataset.modality==='keyboard'&&/^(Shift|Enter| |Escape|Arrow)/.test(event.key)?'keyboard':'pointer';},true);
-if(transportKind==='slip'){$('transport-description').textContent='Сохранённый Slip: после штриха музыка возвращается в текущее фоновое время. Цепочки змей в этом режиме не звучат.';$('texture-routing').hidden=true;}
+if(transportKind==='slip')$('texture-routing').hidden=true;
 const wheel=new WheelScratch({
   grab:()=>audio.grab(view.progress>0?view.selected:1),motion:(v,a)=>applyScratch(v,a),release:options=>audio.release(options),
   changed:state=>{root.dataset.wheelScratching=String(state.active);if(!gesture)stage.dataset.gesture=state.active?'scratch':'';}
@@ -424,7 +425,30 @@ function renderLexicon(){
     if(!word){const gap=document.createElement('span');gap.className='lexicon-gap';return gap;}
     const b=document.createElement('button');b.type='button';b.textContent=word;
     b.addEventListener('click',()=>{if(casting)return;spellInput.value=word;$('spell-form').requestSubmit();});return b;}));
+  renderCommands();
 }
+// Desktop: while the line has focus, every command it understands is listed
+// under it, narrowed by what is typed. A click runs it or fills the line.
+const commandList=$('command-list');
+function renderCommands(){
+  const focus=view.progress>.5&&view.target===1,snake=focus?snakeOf(selectedUid):null;
+  const present=[...new Set(chains.rings.flat().map(s=>SPECIES.find(p=>p.id===s.id)?.name).filter(Boolean))];
+  commandList.replaceChildren(...commandGroups(spellInput.value,{present,channel:snake?snake.channel:-1}).map(group=>{
+    const row=document.createElement('div'),title=document.createElement('span');row.className='command-group';title.textContent=group.title;row.append(title);
+    for(const item of group.items){
+      const b=document.createElement('button');b.type='button';b.textContent=item.label;
+      b.addEventListener('click',()=>{
+        if(casting)return;
+        if(item.send){spellInput.value=item.value;$('spell-form').requestSubmit();return;}
+        spellInput.value=item.append?spellInput.value+item.value:item.value;spellInput.focus({preventScroll:true});renderCommands();
+      });
+      row.append(b);
+    }
+    return row;
+  }));
+}
+commandList.addEventListener('pointerdown',e=>e.preventDefault());
+spellInput.addEventListener('input',renderCommands);spellInput.addEventListener('focus',renderCommands);
 renderLexicon();
 // ——— Voice of the abyss ———
 const voiceFormat={level:v=>Math.round(v/.6*100)+'%',pitch:v=>'×'+v.toFixed(2),tone:v=>Math.round(v)+' Гц',robot:v=>Math.round(v*100)+'%',carrier:v=>Math.round(v)+' Гц'};

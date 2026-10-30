@@ -157,3 +157,15 @@ test('the empty line retypes the chosen invitations one character at a time',asy
   t.next();t.next();assert.equal(t.settle(),t.target);assert.equal(t.text,t.target);
   const r=new Typewriter(INVITATIONS,()=>.5),a=r.next(true).text;assert.ok(INVITATIONS.includes(a),'reduced motion swaps whole phrases');
 });
+
+test('the command list shows every command and narrows to what is typed',async()=>{
+  const {commandGroups}=await import(`${root}/commands.mjs`);
+  const all=commandGroups('',{present:['Ветер']}),labels=all.flatMap(g=>g.items.map(i=>i.label));
+  for(const w of ['Корень','Камень','Ветер','Нить','Кость','Кремень','Свод','Ярость','Расщепление','Эхо','Туман','Лёд','Дрожь','Снять','голос','убрать Ветер','кольцо …','всё …'])assert.ok(labels.includes(w),w);
+  assert.ok(!all.some(g=>g.title==='Руны'),'runes only in an open ring');
+  assert.deepEqual(commandGroups('ко',{present:[]}).flatMap(g=>g.items.map(i=>i.label)),['Корень','Кость','кольцо …']);
+  assert.deepEqual(commandGroups('всё ту').flatMap(g=>g.items.map(i=>i.value)),['всё Туман']);
+  assert.deepEqual(commandGroups('убрать к',{present:['Ветер','Камень']}).flatMap(g=>g.items.map(i=>i.value)),['убрать Камень']);
+  const ring=commandGroups('',{present:['Ветер'],channel:1});assert.deepEqual(ring.find(g=>g.title==='Руны').items.map(i=>i.label),['1','2','3','4','5','6','7','8','·','—']);
+  assert.ok(commandGroups('1 2',{channel:1}).some(g=>g.title==='Руны'));assert.equal(commandGroups('zzz').length,0);
+});
