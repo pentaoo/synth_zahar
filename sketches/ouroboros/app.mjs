@@ -294,7 +294,8 @@ function updateViewUi(scene){
   Object.assign(spellLine.style,{left:(mobile?(width-lineWidth)/2:columnX+inset)+'px',top:lineTop+'px',width:lineWidth+'px'});
   // Desktop: the log runs from 250px (16 + 234) to 16px above the bottom.
   const logTop=16+234;
-  spellLog.hidden=mobile;Object.assign(spellLog.style,{left:columnX+'px',width:g.span(2)+'px',top:logTop+'px',height:Math.max(0,height-logTop-16)+'px'});
+  // Log lines are never wider than the line's underline.
+  spellLog.hidden=mobile;Object.assign(spellLog.style,{left:columnX+inset+'px',width:lineWidth+'px',top:logTop+'px',height:Math.max(0,height-logTop-16)+'px'});
   // The line stays in place in an open ring too; the miniature sits top centre.
   spellLine.hidden=finale.state==='closing';
   minimap.setAttribute('aria-label',mobile?'Вся композиция. Нажми, чтобы вернуться.':'Остальные кольца. Нажми, чтобы вернуться.');
