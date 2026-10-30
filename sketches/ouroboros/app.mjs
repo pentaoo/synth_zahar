@@ -44,7 +44,7 @@ root.dataset.transport=transportKind;
 root.dataset.modality='pointer';
 // Only real keyboard navigation shows focus rings; Escape and typing do not.
 window.addEventListener('pointerdown',()=>{root.dataset.modality='pointer';},true);
-window.addEventListener('keydown',event=>{if(event.key==='Tab'||event.key.startsWith('Arrow'))root.dataset.modality='keyboard';},true);
+window.addEventListener('keydown',event=>{root.dataset.modality=event.key==='Tab'?'keyboard':root.dataset.modality==='keyboard'&&/^(Shift|Enter| |Escape|Arrow)/.test(event.key)?'keyboard':'pointer';},true);
 if(transportKind==='slip'){$('transport-description').textContent='Сохранённый Slip: после штриха музыка возвращается в текущее фоновое время. Цепочки змей в этом режиме не звучат.';$('texture-routing').hidden=true;}
 const wheel=new WheelScratch({
   grab:()=>audio.grab(),motion:(v,a)=>applyScratch(v,a),release:options=>audio.release(options),

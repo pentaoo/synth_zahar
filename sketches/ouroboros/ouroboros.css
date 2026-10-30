@@ -4,9 +4,12 @@
 html,body{width:100%;height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:#fff;color:#000}
 button,select,input{font:inherit;color:#000}
 button{border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
-button:focus-visible,canvas:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:1px solid #000;outline-offset:5px}
-canvas:focus-visible{outline-offset:-5px}
-[data-modality="pointer"] canvas:focus-visible{outline:none}
+/* Focus is drawn only while the user moves with Tab / Shift+Tab. */
+:focus,:focus-visible{outline:none}
+*{-webkit-tap-highlight-color:transparent}
+[data-modality="keyboard"] :is(button,canvas,select,input,summary,a,[tabindex]):focus-visible{outline:1px solid #000;outline-offset:5px}
+[data-modality="keyboard"] canvas:focus-visible{outline-offset:-5px}
+[data-modality="keyboard"] #spell-input:focus-visible{outline:0}
 .instrument{position:fixed;inset:0;overflow:hidden;isolation:isolate;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 .stage{position:absolute;inset:0;touch-action:none;user-select:none;-webkit-user-select:none}
 canvas{position:absolute;inset:0;display:block;width:100%;height:100%}
