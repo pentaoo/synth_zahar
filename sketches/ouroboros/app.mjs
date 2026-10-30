@@ -278,7 +278,10 @@ function updateViewUi(scene){
   const lineWidth=mobile?Math.min(330,width-40):Math.min(360,Math.max(280,width*.26));
   const focusLine=p>.5&&finale.state==='ready';
   const lineY=focusLine?(mobile?scene.mini.y+scene.mini.size+6:Math.max(20,controlRect(width,height).y-118)):(mobile?height*.77:height-112);
-  Object.assign(spellLine.style,{left:(focusLine&&!mobile?Math.max(28,width*.032):(width-lineWidth)/2)+'px',top:lineY+'px',width:lineWidth+'px'});
+  // Keep the whole line block on screen, and above the on-screen keyboard when it is open.
+  const vv=window.visualViewport,visibleBottom=vv?Math.min(height,vv.offsetTop+vv.height-stage.getBoundingClientRect().top):height;
+  const lineTop=Math.max(8,Math.min(lineY,visibleBottom-spellLine.offsetHeight-8));
+  Object.assign(spellLine.style,{left:(focusLine&&!mobile?Math.max(28,width*.032):(width-lineWidth)/2)+'px',top:lineTop+'px',width:lineWidth+'px'});
   spellLine.hidden=finale.state==='closing';
   minimap.setAttribute('aria-label',mobile?'Вся композиция. Нажми, чтобы вернуться.':'Остальные кольца. Нажми, чтобы вернуться.');
   panel.hidden=p<.97||view.target===0||finale.state!=='ready';if(!voicePanel.hidden&&(p>0||finale.state!=='ready'))toggleVoice(false);minimap.hidden=!scene.miniActive||finale.state!=='ready';inkButton.hidden=p>0||finale.state!=='ready';
@@ -401,7 +404,9 @@ for(const input of voicePanel.querySelectorAll('[data-voice]'))input.addEventLis
 $('voice-every').addEventListener('change',e=>{audio.setVoiceParam('every',Number(e.target.value));populateVoice();});
 $('voice-close').addEventListener('click',()=>toggleVoice(false));
 $('voice-say').addEventListener('click',async()=>{if(await start())audio.sayVoice();});
-window.visualViewport?.addEventListener('resize',()=>{root.style.height=window.visualViewport.height+'px';resize();});
+// The on-screen keyboard must not resize the stage or scroll the page: the line moves above it instead.
+const unscroll=()=>{if(window.scrollX||window.scrollY)window.scrollTo(0,0);};
+window.addEventListener('scroll',unscroll);window.visualViewport?.addEventListener('resize',unscroll);window.visualViewport?.addEventListener('scroll',unscroll);
 try{
   renderer=new EngravingRenderer(canvas,$('ink-canvas'));new ResizeObserver(resize).observe(stage);resize();
   renderer.initialize().then(()=>{if(!feedback.textContent)message(mobileLayout(width,height)?'Коснись бездны в центре — играть. Впиши имя змеи — она прилетит.':'Пробел — играть. Впиши имя змеи — она прилетит.',true);}).catch(e=>message(e.message,true));requestAnimationFrame(frame);

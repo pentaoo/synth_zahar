@@ -7,7 +7,7 @@ button{border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:trans
 button:focus-visible,canvas:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:1px solid #000;outline-offset:5px}
 canvas:focus-visible{outline-offset:-5px}
 [data-modality="pointer"] canvas:focus-visible{outline:none}
-.instrument{height:100dvh;min-height:360px;position:relative;isolation:isolate;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+.instrument{position:fixed;inset:0;overflow:hidden;isolation:isolate;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 .stage{position:absolute;inset:0;touch-action:none;user-select:none;-webkit-user-select:none}
 canvas{position:absolute;inset:0;display:block;width:100%;height:100%}
 #canvas{touch-action:none}
@@ -77,3 +77,8 @@ dialog .shortcuts{font-size:12px}
 .text-button{padding:6px 0;font-size:13px;border-bottom:1px solid #000;margin-top:6px}
 .spell-lexicon .lexicon-gap{width:100%;height:0}
 [data-mobile="true"] .voice-panel{top:max(12px,env(safe-area-inset-top));height:min(46dvh,420px)}
+[data-mobile="true"] .spell-lexicon{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;gap:0 14px;margin-right:-20px;padding-right:20px;-webkit-overflow-scrolling:touch}
+[data-mobile="true"] .spell-lexicon::-webkit-scrollbar{display:none}
+[data-mobile="true"] .spell-lexicon button{flex:none;font-size:14px}
+[data-mobile="true"] .spell-lexicon .lexicon-gap{width:10px;flex:none}
+[data-mobile="true"] #spell-feedback{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
