@@ -7,3 +7,31 @@ node_modules/
 
 # Personal composition snapshots stay on this computer.
 saved-layouts/
+
+# Editors and systems
+.vscode/
+.idea/
+Thumbs.db
+*.swp
+*.tmp
+
+# macOS Finder duplicates ("file 2.png", "folder 2")
+* 2
+* 2.*
+
+# Check results, recordings and archives stay out of the repo.
+*.tar.gz
+*.zip
+*.gif
+*.mov
+*.mp4
+results*/
+review-*/
+qa/
+screenshots/
+**/archive/
+
+# Personal design folders on this computer
+design/lounge/
+design/figma-ui-kit/
+design/preview-assets*/

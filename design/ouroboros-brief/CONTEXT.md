@@ -7,8 +7,6 @@
 3. [Правила проекта](../../AGENTS.md) — ограничения и границы разных прототипов.
 4. [Музыкальное направление](../../MUSIC-DIRECTION.md) — авторские ориентиры и рабочие звуковые решения.
 5. [Управление](../../sketches/ouroboros/README-RITUAL.md) — первым читать раздел «цепочки змей».
-6. [Проверка перед публикацией](results-push/QA.md) — текущие 95 тестов; прежние браузерные материалы перечислены отдельно.
+6. [Исследование эффектов](SPELL-EFFECTS-RESEARCH.md) — кандидаты для заклинаний.
 
-Задания `IMPLEMENTATION-PROMPT.md`, `REVISION-IMPLEMENTATION-PROMPT.md` и `INTERFACE-RUN-PROMPT.md` сохранены как реальные этапы промпт-дизайна. Не применять их целиком как новый список невыполненных задач.
-
-Снимок прежних контекстных файлов: [archive/context-before-instrument-update-2026-10-30/manifest.json](archive/context-before-instrument-update-2026-10-30/manifest.json). Он сохраняет историю, но не задаёт текущее состояние.
+Задания `IMPLEMENTATION-PROMPT.md`, `REVISION-IMPLEMENTATION-PROMPT.md`, `INTERFACE-RUN-PROMPT.md`, QA-отчёты, снимки и архив прежнего контекста удалены из рабочей копии при чистке 30 октября 2026 и остаются в истории git.
