@@ -4,15 +4,15 @@ import {CreatureLife} from './creature-state.mjs?v=chains-2';
 import {SPELLS,SPELL_WORDS} from './spell-book.mjs?v=chains-2';
 import {RING_NAMES,SPECIES,parseCommand,nextCell,cellLabel} from './chain-model.mjs?v=chains-2';
 import {TouchPinch} from './touch-pinch.mjs';
-import {mobileLayout,ritualSize} from './ritual-geometry.mjs?v=chains-4';
+import {mobileLayout,ritualSize} from './ritual-geometry.mjs?v=chains-5';
 import {WheelScratch} from './wheel-scratch.mjs';
 import {PinchScale,MIN_SCALE} from './pinch-scale.mjs?v=ritual-9';
 import {HandMotion,ScratchResponse,SCRATCH_INPUT} from './scratch-motion.mjs';
-import {RINGS,TAU,ringMetrics,bodyPoint,project,unproject,BodyIntent,controlRect,grid} from './body-geometry.mjs?v=chains-4';
+import {RINGS,TAU,ringMetrics,bodyPoint,project,unproject,BodyIntent,controlRect,grid} from './body-geometry.mjs?v=chains-5';
 import {shortcut} from './input-shortcuts.mjs?v=chains-2';
 import {ViewState,Finale} from './view-state.mjs?v=chains-2';
 import {InkMass} from './ink-physics.mjs?v=chains-2';
-import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-8';
+import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-9';
 
 const $=id=>document.getElementById(id),root=$('ouroboros'),stage=$('stage'),canvas=$('canvas'),inkButton=$('ink'),probe=$('audio-state'),panel=$('channel-panel'),minimap=$('minimap'),dialog=$('sound-dialog');
 const voicePanel=$('voice-panel'),spellLine=$('spell-line'),spellInput=$('spell-input'),feedback=$('spell-feedback'),life=new CreatureLife(),touchPinch=new TouchPinch();
@@ -286,10 +286,13 @@ function updateViewUi(scene){
   const vv=window.visualViewport,visibleBottom=vv?Math.min(height,vv.offsetTop+vv.height-stage.getBoundingClientRect().top):height;
   const lineTop=Math.max(8,Math.min(lineY,visibleBottom-spellLine.offsetHeight-8));
   Object.assign(spellLine.style,{left:(mobile?(width-lineWidth)/2:g.x(0))+'px',top:lineTop+'px',width:lineWidth+'px'});
-  // The log keeps the full height of its columns; the miniature sits top centre, as on the phone.
-  spellLog.hidden=mobile;Object.assign(spellLog.style,{left:g.x(5)+'px',width:g.span(2)+'px',top:'16px',height:Math.max(0,height-32)+'px'});
+  // Desktop: the log runs down the last two columns from under the miniature to 16px above the bottom.
+  const logTop=scene.mini.y+scene.mini.size;
+  spellLog.hidden=mobile;Object.assign(spellLog.style,{left:g.x(5)+'px',width:g.span(2)+'px',top:logTop+'px',height:Math.max(0,height-logTop-16)+'px'});
   // Desktop: while a snake's settings fill the first two columns the line steps aside.
+  // In the overview it stays invisible until a key is typed or Tab reaches it.
   spellLine.hidden=finale.state==='closing'||(!mobile&&focusLine);
+  spellLine.classList.toggle('idle',!mobile&&!spellInput.value&&document.activeElement!==spellInput);
   minimap.setAttribute('aria-label',mobile?'Вся композиция. Нажми, чтобы вернуться.':'Остальные кольца. Нажми, чтобы вернуться.');
   panel.hidden=p<.97||view.target===0||finale.state!=='ready';if(!voicePanel.hidden&&(p>0||finale.state!=='ready'))toggleVoice(false);minimap.hidden=!scene.miniActive||finale.state!=='ready';inkButton.hidden=p>0||finale.state!=='ready';
   root.dataset.view=p>.1?'focus':'overview';
@@ -372,9 +375,10 @@ function turnRune(hit,step){
   selectedUid=snake.uid;if(write(snake.uid,cells))message(snake.name+' · '+(hit.index+1)+' доля: '+cellLabel(snake.channel,cells[hit.index])+' · со следующего прохода');
 }
 // The log of this game: everything entered in the line, small and centred,
-// each entry on its own line, the newest at the bottom.
+// each entry on its own line, the newest at the bottom. A long log scrolls so
+// the newest entry sits just above the white fade at the foot of the column.
 const spellLog=$('spell-log'),scrollText=$('spell-log-text');
-function layoutScroll(){if(!spellLog.hidden)spellLog.classList.toggle('overflowing',scrollText.offsetHeight>spellLog.clientHeight);}
+function layoutScroll(){if(!spellLog.hidden)spellLog.scrollTop=spellLog.scrollHeight;}
 function logLine(text){
   const line=document.createElement('span');line.textContent=text;scrollText.append(line);
   while(scrollText.childElementCount>200)scrollText.firstElementChild.remove();

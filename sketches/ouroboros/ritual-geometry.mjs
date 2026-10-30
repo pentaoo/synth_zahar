@@ -1,4 +1,4 @@
-import {TAU,ATLAS,HEAD_UNITS,MOUTH_UNITS,bodyPoint,presentation,project,unproject,grid} from './body-geometry.mjs?v=chains-4';
+import {TAU,ATLAS,HEAD_UNITS,MOUTH_UNITS,bodyPoint,presentation,project,unproject,grid} from './body-geometry.mjs?v=chains-5';
 import {CREATURES,PHRASE_BEATS} from './ritual-model.mjs';
 import {clamp,angleDelta} from './score.mjs';
 export const mobileLayout=(w,h)=>w<700||(h<520&&w<1000);

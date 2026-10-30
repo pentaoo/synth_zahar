@@ -1,5 +1,5 @@
-import {TAU,RINGS,ringMetrics,collapsePresentation,project,unproject} from './body-geometry.mjs?v=chains-4';
-import {chainCreatures,chainShares,creaturePoint,sampleCreature,ritualPresentation,hitCreature,eyePoint} from './ritual-geometry.mjs?v=chains-4';
+import {TAU,RINGS,ringMetrics,collapsePresentation,project,unproject} from './body-geometry.mjs?v=chains-5';
+import {chainCreatures,chainShares,creaturePoint,sampleCreature,ritualPresentation,hitCreature,eyePoint} from './ritual-geometry.mjs?v=chains-5';
 import {SPECIES,CELLS,runeFor} from './chain-model.mjs?v=chains-2';
 import {angleDelta} from './score.mjs';
 const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
@@ -306,6 +306,8 @@ export class EngravingRenderer {
       const t=reduced?1:(this.clock-d.start)/DEPART_SECONDS;if(t>=1)return false;const c={...d.creature},H=c.thickness*c.headUnits;c.length+=Math.max(0,c.fullLength-c.length)*smooth(t*8);
       draw([c],d.camera,{kind:'depart',gate:d.gate,headLength:H,distance:smooth(t)*(c.length+H+Math.hypot(width,height)/d.camera.scale+c.thickness*4)});return true;
     });
+    // Desktop overview: the miniature over the log repeats the whole composition.
+    if(!layout.mobile&&!layout.miniActive&&!finalePose)draw(others,{scale:mini.size/(baseRadius*2.55),rotation:0,tx:mini.x+mini.size/2,ty:mini.y+mini.size/2},0,true);
     const windowRadius=Math.max(0,rings[2].radius-rings[2].thickness*.65);this.ink(ink,remaining,windowRadius,1);
     if(layout.mobile&&p>=.54){
       // The mobile miniature includes the selected ring, without a second audio source.

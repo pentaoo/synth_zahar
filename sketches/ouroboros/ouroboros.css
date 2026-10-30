@@ -6,7 +6,7 @@
   --type-body:400 14px/1.6 var(--serif);    /* Текст: абзацы окна, подписи и теги на телефоне */
   --type-caption:400 12px/1.5 var(--serif); /* Подпись: подписи ползунков, теги, выпадающие списки, кнопки */
   --type-micro:400 11px/1.45 var(--serif);  /* Мелкий: значения, подсказка рун */
-  --type-log:400 8px/1.5 var(--serif);      /* Лог: всё сказанное, справа */
+  --type-log:400 8px/2 var(--serif);      /* Лог: всё сказанное, справа */
   font:var(--type-body)}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -79,6 +79,9 @@ dialog .shortcuts{font:var(--type-caption)}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 
 .spell-line[hidden]{display:none}
+/* Desktop overview: the line is not drawn until someone types or tabs into it. */
+.spell-line.idle{opacity:0;pointer-events:none}
+.spell-line.idle:focus-within{opacity:1}
 [data-view="focus"] .spell-lexicon{display:none}
 .rune-help{font:var(--type-micro);margin:0 0 12px}
 [data-mobile="true"] .rune-help{display:none}
@@ -95,11 +98,12 @@ dialog .shortcuts{font:var(--type-caption)}
 [data-mobile="true"] .spell-lexicon .lexicon-gap{width:10px;flex:none}
 [data-mobile="true"] #spell-feedback{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
 /* The log: everything entered in the line, small and centred in the last two
-   grid columns, one entry per line, ragged on both sides. */
-.spell-log{position:absolute;z-index:4;display:flex;flex-direction:column;justify-content:center;overflow:hidden;pointer-events:none;-webkit-mask-image:linear-gradient(transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(transparent,#000 12%,#000 88%,transparent)}
-.spell-log.overflowing{justify-content:flex-end}
+   grid columns under the miniature, one entry per line, ragged on both sides.
+   The foot of the column fades to white (322px in the layout); the padding
+   keeps the newest entry above the fade once the log is long. */
+.spell-log{position:absolute;z-index:4;overflow:hidden;pointer-events:none;--fade:min(322px,40%);-webkit-mask-image:linear-gradient(#000 calc(100% - var(--fade)),transparent);mask-image:linear-gradient(#000 calc(100% - var(--fade)),transparent)}
 .spell-log[hidden]{display:none}
-.spell-log .scroll{flex:none;background:#fff}
+.spell-log .scroll{background:#fff;padding-bottom:min(322px,40vh)}
 .spell-log p{margin:0;font:var(--type-log);text-align:center;overflow-wrap:anywhere}
 .spell-log p span{display:block}
 /* Desktop: nothing is written on the left; what was said goes to the log. */
