@@ -379,11 +379,12 @@ function turnRune(hit,step){
   selectedUid=snake.uid;if(write(snake.uid,cells))message(snake.name+' · '+(hit.index+1)+' доля: '+cellLabel(snake.channel,cells[hit.index])+' · со следующего прохода');
 }
 // The log of this game: everything entered in the line, small and centred,
-// each entry on its own line, the newest at the bottom; it is never clipped.
+// each entry on its own line. The newest comes in at the top and pushes the
+// older ones down; it is never clipped.
 const spellLog=$('spell-log'),scrollText=$('spell-log-text');
 function logLine(text){
-  const line=document.createElement('span');line.textContent=text;scrollText.append(line);
-  while(scrollText.childElementCount>200)scrollText.firstElementChild.remove();
+  const line=document.createElement('span');line.textContent=text;scrollText.prepend(line);
+  while(scrollText.childElementCount>200)scrollText.lastElementChild.remove();
 }
 // The empty line retypes its invitation; it rests while someone writes in it.
 const typewriter=new Typewriter(),reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
