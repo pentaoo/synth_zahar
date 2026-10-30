@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-30",
+  "scope": "Project context before rebuild; original paths preserved",
+  "superseded_by": [
+    "design/ouroboros-brief/CONTEXT.md",
+    "INSTRUMENTS.md"
+  ],
+  "files": [
+    "AGENTS.md",
+    "MUSIC-DIRECTION.md",
+    "OUROBOROS-CONCEPT.md",
+    "FEATURE-REVIEW.md",
+    "BOOM-BAP-BRIEF.md",
+    "design/ouroboros-brief/CONTEXT-2026-10-30.md",
+    "design/ouroboros-brief/RITUAL-DISCUSSION.md",
+    "design/ouroboros-brief/SPELL-EFFECTS-RESEARCH.md",
+    "design/ouroboros-brief/INTERFACE-RUN-PROMPT.md"
+  ]
+}

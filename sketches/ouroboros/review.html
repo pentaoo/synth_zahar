@@ -1,0 +1,6 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Уроборос — проверка размеров</title>
+<style>body{margin:0;background:#fff;color:#000;font:14px Georgia}nav{padding:12px;display:flex;gap:16px}button{font:inherit;background:#fff;color:#000;border:1px solid #000;padding:8px;cursor:pointer}iframe{display:block;border:1px solid #000;margin:12px}p{margin:12px}</style>
+<nav><button data-size="1366,768">1366 × 768</button><button data-size="1280,800">1280 × 800</button><button data-size="390,844">390 × 844</button><button data-size="360,800">360 × 800</button><button data-size="844,390">844 × 390</button><button data-size="390,440">390 × 440 · ввод</button></nav>
+<p id="size">Встроенный viewport 1366 × 768. Это проверка в браузере, не физический телефон.</p>
+<iframe title="Инструмент в выбранном размере" src="./?review=1" width="1366" height="768" allow="autoplay"></iframe>
+<script>for(const b of document.querySelectorAll('button'))b.onclick=()=>{const [w,h]=b.dataset.size.split(',');const f=document.querySelector('iframe');f.width=w;f.height=h;document.getElementById('size').textContent=`Встроенный viewport ${w} × ${h}. Это проверка в браузере, не физический телефон.`;};</script></html>
