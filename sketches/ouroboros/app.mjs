@@ -368,19 +368,28 @@ function turnRune(hit,step){
   if(hit.index===0&&cells[0]==='-')cells[0]=nextCell(snake.channel,'-',step);
   selectedUid=snake.uid;if(write(snake.uid,cells))message(snake.name+' · '+(hit.index+1)+' доля: '+cellLabel(snake.channel,cells[hit.index])+' · со следующего прохода');
 }
-// The log of this game: every line entered, newest first, with what it did.
-const spellLog=$('spell-log'),spellLogList=$('spell-log-list');
+// The log of this game: everything entered in the line, as one running text
+// set like an old scroll: small, centred, its column gently swaying.
+const spellLog=$('spell-log'),spellLogList=$('spell-log-list'),scrollText=$('spell-log-text'),bends=[...spellLogList.querySelectorAll('.bend')];
+const swayShape=(height,side)=>{const points=[];for(let k=0;k<=24;k++){const y=k/24,b=Math.sin(Math.PI*1.5*y-Math.PI*.25),x=50+(side==='left'?44:-44)*b;points.push(`${(side==='left'?x:100-x).toFixed(1)}% ${(y*100).toFixed(1)}%`);}
+  return side==='left'?`polygon(0 0,${points.join(',')},0 100%)`:`polygon(100% 0,${points.join(',')},100% 100%)`;};
+function layoutScroll(){
+  if(spellLog.hidden)return;const room=spellLog.clientHeight;
+  for(const b of bends){b.style.height=room+'px';b.style.shapeOutside=swayShape(room,b.dataset.side);}
+  // Fit the bends to the text, twice, since they change how it wraps.
+  for(let k=0;k<2;k++){const h=Math.min(room,Math.max(1,scrollText.offsetHeight));for(const b of bends)b.style.height=h+'px';}
+  spellLog.classList.toggle('overflowing',scrollText.offsetHeight>room);
+}
 function logLine(text){
-  const li=document.createElement('li'),said=document.createElement('span'),note=document.createElement('span');
-  said.className='said';said.textContent=text;note.className='note';li.append(said,note);spellLogList.prepend(li);
-  while(spellLogList.children.length>60)spellLogList.lastElementChild.remove();
-  return note;
+  scrollText.textContent=(scrollText.textContent?scrollText.textContent+' ':'')+text;
+  if(scrollText.textContent.length>6000)scrollText.textContent=scrollText.textContent.slice(-6000).replace(/^\S*\s/,'');
+  layoutScroll();
 }
 $('spell-form').addEventListener('submit',async e=>{
   e.preventDefault();if(casting||!spellInput.value.trim())return;
-  const text=spellInput.value.trim(),note=logLine(text);await runLine();
-  const did=feedback.textContent;note.textContent=did.startsWith('«')?'':did;
+  logLine(spellInput.value.trim());await runLine();spellInput.value='';renderLexicon();
 });
+window.addEventListener('resize',()=>requestAnimationFrame(layoutScroll));
 async function runLine(){
   const text=spellInput.value,focus=view.progress>.5&&view.target===1,snake=snakeOf(selectedUid);
   if(/^\s*голос\s*$/i.test(text)){spellInput.value='';audio.speakWord(text);toggleVoice(true);return;}
@@ -398,10 +407,16 @@ async function runLine(){
   if(result.ok){lastIncantation={key:result.spell.key,id:result.id,targets:result.targets,word:result.spell.word,recipient:to.label};feedback.dataset.kind='spell';feedback.textContent=result.spell.rune+' '+result.spell.word+' · '+to.label;probe.dataset.lastCast=JSON.stringify({id:result.id,key:result.spell.key,targets:result.targets});}
 }
 // Hints under the line: three names, every word, and the voice.
-$('spell-lexicon').replaceChildren(...[...['Нить','Корень','Кость'],null,...SPELLS.map(s=>s.word),'голос'].map(word=>{
-  if(!word){const gap=document.createElement('span');gap.className='lexicon-gap';return gap;}
-  const b=document.createElement('button');b.type='button';b.textContent=word;
-  b.addEventListener('click',()=>{if(word==='голос'){toggleVoice(true);return;}spellInput.value=word;spellInput.focus({preventScroll:true});});return b;}));
+// Tags under the line: the names not yet on the field, then every word, then the voice.
+// A tag is said at once, like typing it and pressing Enter; the line stays empty.
+function renderLexicon(){
+  const absent=SPECIES.filter(s=>!chains.rings[s.channel].some(c=>c.id===s.id)).map(s=>s.name);
+  $('spell-lexicon').replaceChildren(...[...absent,null,...SPELLS.map(s=>s.word),'голос'].map(word=>{
+    if(!word){const gap=document.createElement('span');gap.className='lexicon-gap';return gap;}
+    const b=document.createElement('button');b.type='button';b.textContent=word;
+    b.addEventListener('click',()=>{if(casting)return;spellInput.value=word;$('spell-form').requestSubmit();});return b;}));
+}
+renderLexicon();
 // ——— Voice of the abyss ———
 const voiceFormat={level:v=>Math.round(v/.6*100)+'%',pitch:v=>'×'+v.toFixed(2),tone:v=>Math.round(v)+' Гц',robot:v=>Math.round(v*100)+'%',carrier:v=>Math.round(v)+' Гц'};
 function populateVoice(){
