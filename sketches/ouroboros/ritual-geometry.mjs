@@ -1,8 +1,9 @@
-import {TAU,ATLAS,HEAD_UNITS,MOUTH_UNITS,bodyPoint,presentation,project,unproject} from './body-geometry.mjs?v=chains-2';
+import {TAU,ATLAS,HEAD_UNITS,MOUTH_UNITS,bodyPoint,presentation,project,unproject,grid} from './body-geometry.mjs?v=chains-3';
 import {CREATURES,PHRASE_BEATS} from './ritual-model.mjs';
 import {clamp,angleDelta} from './score.mjs';
 export const mobileLayout=(w,h)=>w<700||(h<520&&w<1000);
-export function ritualSize(w,h){return mobileLayout(w,h)?Math.max(76,Math.min(w*.37,h*.31)):Math.max(90,Math.min(w*.275,h*.385,410));}
+// On desktop the three rings, heads included, fit the middle three grid columns.
+export function ritualSize(w,h){return mobileLayout(w,h)?Math.max(76,Math.min(w*.37,h*.31)):Math.max(90,Math.min(grid(w).span(3)/2.3,h*.385,410));}
 export function pairCreatures(ring,lead=0,skins={},lengths=PHRASE_BEATS){
   const total=lengths.reduce((a,b)=>a+b,0),order=[lead,1-lead];let fraction=0;
   return order.map(part=>{

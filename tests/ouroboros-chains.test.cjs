@@ -110,3 +110,14 @@ test('every typed word is read aloud: words without a recording go to the system
   assert.equal(speakAloud('   '),false);
   delete globalThis.speechSynthesis;delete globalThis.SpeechSynthesisUtterance;
 });
+
+test('desktop grid: seven columns, rings in the middle three, settings in the first two, minimap in the last two',async()=>{
+  const {grid,controlRect,presentation,ringMetrics}=await import(`${root}/body-geometry.mjs`);const {ritualSize}=await import(`${root}/ritual-geometry.mjs`);
+  for(const [w,h] of [[1440,900],[1024,720],[1920,1080]]){
+    const g=grid(w);near(g.x(6)+g.col,w-g.margin,1e-6);
+    assert.ok(ritualSize(w,h)*2.3<=g.span(3)+1e-6,'the composition fits three columns');
+    const c=controlRect(w,h);assert.equal(c.x,g.x(0));assert.ok(c.x+c.width<=g.x(2),'settings stay in the first two columns');
+    const ring={...ringMetrics(0,ritualSize(w,h)),headAngle:0};const {mini}=presentation(w,h,ritualSize(w,h),ring,{progress:.6});
+    assert.ok(mini.x>=g.x(5)-1e-6&&mini.x+mini.size<=g.x(6)+g.col+1e-6,'minimap in the last two columns');
+  }
+});

@@ -4,15 +4,15 @@ import {CreatureLife} from './creature-state.mjs?v=chains-2';
 import {SPELLS,SPELL_WORDS} from './spell-book.mjs?v=chains-2';
 import {RING_NAMES,SPECIES,parseCommand,nextCell,cellLabel} from './chain-model.mjs?v=chains-2';
 import {TouchPinch} from './touch-pinch.mjs';
-import {mobileLayout,ritualSize} from './ritual-geometry.mjs?v=chains-2';
+import {mobileLayout,ritualSize} from './ritual-geometry.mjs?v=chains-3';
 import {WheelScratch} from './wheel-scratch.mjs';
 import {PinchScale,MIN_SCALE} from './pinch-scale.mjs?v=ritual-9';
 import {HandMotion,ScratchResponse,SCRATCH_INPUT} from './scratch-motion.mjs';
-import {RINGS,TAU,ringMetrics,bodyPoint,project,unproject,BodyIntent,controlRect} from './body-geometry.mjs?v=chains-2';
+import {RINGS,TAU,ringMetrics,bodyPoint,project,unproject,BodyIntent,controlRect,grid} from './body-geometry.mjs?v=chains-3';
 import {shortcut} from './input-shortcuts.mjs?v=chains-2';
 import {ViewState,Finale} from './view-state.mjs?v=chains-2';
 import {InkMass} from './ink-physics.mjs?v=chains-2';
-import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-3';
+import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-4';
 
 const $=id=>document.getElementById(id),root=$('ouroboros'),stage=$('stage'),canvas=$('canvas'),inkButton=$('ink'),probe=$('audio-state'),panel=$('channel-panel'),minimap=$('minimap'),dialog=$('sound-dialog');
 const voicePanel=$('voice-panel'),spellLine=$('spell-line'),spellInput=$('spell-input'),feedback=$('spell-feedback'),life=new CreatureLife(),touchPinch=new TouchPinch();
@@ -275,14 +275,18 @@ function updateViewUi(scene){
   root.style.setProperty('--controls-top',Math.round(scene.mini.y+scene.mini.size+(mobile?92:16))+'px');
   root.style.setProperty('--controls-height',Math.max(85,Math.min(390,height*(height<520?.56:.64)-scene.mini.y-scene.mini.size-(mobile?100:28)))+'px');
   // The line is always there: under the circle in the overview, above the controls in the large view.
-  const lineWidth=mobile?Math.min(330,width-40):Math.min(360,Math.max(280,width*.26));
+  // Desktop: the line lives in the first two grid columns, the log in the last two.
+  const g=grid(width),lineWidth=mobile?Math.min(330,width-40):Math.max(240,g.span(2));
   const focusLine=p>.5&&finale.state==='ready';
-  const lineY=focusLine?(mobile?scene.mini.y+scene.mini.size+6:Math.max(20,controlRect(width,height).y-118)):(mobile?height*.77:height-112);
+  const lineY=focusLine?(mobile?scene.mini.y+scene.mini.size+6:Math.max(20,controlRect(width,height).y-118)):(mobile?height*.77:(height-spellLine.offsetHeight)/2);
   // Keep the whole line block on screen, and above the on-screen keyboard when it is open.
   const vv=window.visualViewport,visibleBottom=vv?Math.min(height,vv.offsetTop+vv.height-stage.getBoundingClientRect().top):height;
   const lineTop=Math.max(8,Math.min(lineY,visibleBottom-spellLine.offsetHeight-8));
-  Object.assign(spellLine.style,{left:(focusLine&&!mobile?Math.max(28,width*.032):(width-lineWidth)/2)+'px',top:lineTop+'px',width:lineWidth+'px'});
-  spellLine.hidden=finale.state==='closing';
+  Object.assign(spellLine.style,{left:(mobile?(width-lineWidth)/2:g.x(0))+'px',top:lineTop+'px',width:lineWidth+'px'});
+  const logTop=scene.miniActive&&!mobile?scene.mini.y+scene.mini.size+24:24;
+  spellLog.hidden=mobile;Object.assign(spellLog.style,{left:g.x(5)+'px',width:g.span(2)+'px',top:logTop+'px',height:Math.max(0,height-logTop-24)+'px'});
+  // Desktop: while a snake's settings fill the first two columns the line steps aside.
+  spellLine.hidden=finale.state==='closing'||(!mobile&&focusLine);
   minimap.setAttribute('aria-label',mobile?'Вся композиция. Нажми, чтобы вернуться.':'Остальные кольца. Нажми, чтобы вернуться.');
   panel.hidden=p<.97||view.target===0||finale.state!=='ready';if(!voicePanel.hidden&&(p>0||finale.state!=='ready'))toggleVoice(false);minimap.hidden=!scene.miniActive||finale.state!=='ready';inkButton.hidden=p>0||finale.state!=='ready';
   root.dataset.view=p>.1?'focus':'overview';
@@ -308,7 +312,7 @@ function frame(now){
   const ringClocks=clocks(now),rates=ringClocks.map(c=>c?TAU*model.speed/c.seconds:0),sounding=soundingUids(ringClocks);
   const uids=chains.all.map(s=>s.uid);
   const creatureStates=life.update(now/1000,dt,{snakes:uids,active:sounding,playing:audio.playing,pointer:document.activeElement===spellInput?{x:width*.5,y:height*.85}:pointer,eyes:renderer?.scene?.eyes,selected:selectedUid,contact:gesture?.hit?.uid||'',spells:audio.spells,reduced:reduced.matches});
-  const stageBox=stage.getBoundingClientRect(),avoid=[spellLine,panel,voicePanel,minimap].filter(e=>!e.hidden).map(e=>{const r=e.getBoundingClientRect();return {x:r.left-stageBox.left-8,y:r.top-stageBox.top-8,w:r.width+16,h:r.height+16};});
+  const stageBox=stage.getBoundingClientRect(),avoid=[spellLine,panel,voicePanel,minimap,spellLogList].filter(e=>!e.hidden).map(e=>{const r=e.getBoundingClientRect();return {x:r.left-stageBox.left-8,y:r.top-stageBox.top-8,w:r.width+16,h:r.height+16};});
   const scene=renderer?.render({dt,avoid,life:creatureStates,baseRadius,compression:pinch.scale,chains:chains.rings,clocks:reduced.matches?[]:ringClocks,rates,selectedUid,audible,viewState:view,ink,scratch:{angle:scratchVisual.angle,strength:scratchVisual.strengthAt(now),direction:scratchVisual.direction},finale:finale.progress,finalePose:finale.pose,reduced:reduced.matches});
   if(scene){
     updateViewUi(scene);
@@ -364,8 +368,20 @@ function turnRune(hit,step){
   if(hit.index===0&&cells[0]==='-')cells[0]=nextCell(snake.channel,'-',step);
   selectedUid=snake.uid;if(write(snake.uid,cells))message(snake.name+' · '+(hit.index+1)+' доля: '+cellLabel(snake.channel,cells[hit.index])+' · со следующего прохода');
 }
+// The log of this game: every line entered, newest first, with what it did.
+const spellLog=$('spell-log'),spellLogList=$('spell-log-list');
+function logLine(text){
+  const li=document.createElement('li'),said=document.createElement('span'),note=document.createElement('span');
+  said.className='said';said.textContent=text;note.className='note';li.append(said,note);spellLogList.prepend(li);
+  while(spellLogList.children.length>60)spellLogList.lastElementChild.remove();
+  return note;
+}
 $('spell-form').addEventListener('submit',async e=>{
-  e.preventDefault();if(casting)return;
+  e.preventDefault();if(casting||!spellInput.value.trim())return;
+  const text=spellInput.value.trim(),note=logLine(text);await runLine();
+  const did=feedback.textContent;note.textContent=did.startsWith('«')?'':did;
+});
+async function runLine(){
   const text=spellInput.value,focus=view.progress>.5&&view.target===1,snake=snakeOf(selectedUid);
   if(/^\s*голос\s*$/i.test(text)){spellInput.value='';audio.speakWord(text);toggleVoice(true);return;}
   const command=parseCommand(text,{spells:SPELLS,channel:focus&&snake?snake.channel:-1});
@@ -380,7 +396,7 @@ $('spell-form').addEventListener('submit',async e=>{
   casting=true;feedback.textContent='ᛁ '+command.spell.word+' · ожидает';const ok=await start();casting=false;if(!ok)return;
   const result=audio.castSpell(command.spell.word,{targets:to.targets,voice:to.voice});
   if(result.ok){lastIncantation={key:result.spell.key,id:result.id,targets:result.targets,word:result.spell.word,recipient:to.label};feedback.dataset.kind='spell';feedback.textContent=result.spell.rune+' '+result.spell.word+' · '+to.label;probe.dataset.lastCast=JSON.stringify({id:result.id,key:result.spell.key,targets:result.targets});}
-});
+}
 // Hints under the line: three names, every word, and the voice.
 $('spell-lexicon').replaceChildren(...[...['Нить','Корень','Кость'],null,...SPELLS.map(s=>s.word),'голос'].map(word=>{
   if(!word){const gap=document.createElement('span');gap.className='lexicon-gap';return gap;}

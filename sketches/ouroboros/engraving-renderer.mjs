@@ -1,5 +1,5 @@
-import {TAU,RINGS,ringMetrics,collapsePresentation,project,unproject} from './body-geometry.mjs?v=chains-2';
-import {chainCreatures,chainShares,creaturePoint,sampleCreature,ritualPresentation,hitCreature,eyePoint} from './ritual-geometry.mjs?v=chains-2';
+import {TAU,RINGS,ringMetrics,collapsePresentation,project,unproject} from './body-geometry.mjs?v=chains-3';
+import {chainCreatures,chainShares,creaturePoint,sampleCreature,ritualPresentation,hitCreature,eyePoint} from './ritual-geometry.mjs?v=chains-3';
 import {SPECIES,CELLS,runeFor} from './chain-model.mjs?v=chains-2';
 import {angleDelta} from './score.mjs';
 const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};

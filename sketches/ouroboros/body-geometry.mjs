@@ -54,10 +54,17 @@ export function camera(width,height,baseRadius,ring,progress=0,focusRotation=0){
   }
   return {scale:Math.exp(Math.log(zoom)*t),rotation:focusRotation*t,tx:width/2+(cx-width/2)*t,ty:height*.51+(cy-height*.51)*t};
 }
+// Desktop page grid: seven columns. The rings take the middle three, the
+// line and the snake settings the first two, the log of words the last two.
+export function grid(width){
+  const margin=clamp(width*.03,24,64),gutter=clamp(width*.016,16,32),col=Math.max(0,(width-2*margin-6*gutter)/7);
+  return {margin,gutter,col,x:i=>margin+i*(col+gutter),span:n=>n*col+(n-1)*gutter};
+}
 export function controlRect(width,height){
   const small=width<=600,medium=width<=850;
-  const w=small?Math.min(280,width*.7):medium?290:clamp(width*.23,280,330),h=Math.min(480,height-(small?250:160)),bottom=small?30:medium?40:48;
-  return {x:medium?28:clamp(width*.032,28,64),y:height-bottom-h,width:w,height:h};
+  const h=Math.min(480,height-(small?250:160)),bottom=small?30:medium?40:48;
+  if(small)return {x:28,y:height-bottom-h,width:Math.min(280,width*.7),height:h};
+  const g=grid(width);return {x:g.x(0),y:height-bottom-h,width:Math.max(240,g.span(2)),height:h};
 }
 // Opening: the ring's snakes leave the overview head first along the tangent
 // where they are, then arrive head first into the large view. Closing never
@@ -65,7 +72,7 @@ export function controlRect(width,height){
 // head first back into the overview, landing where the music has carried them.
 export function presentation(width,height,baseRadius,ring,viewState){
   const p=viewState.progress,closing=!!viewState.closing&&p>0,overview={scale:1,rotation:0,tx:width/2,ty:height*.51};
-  const miniSize=Math.min(230,Math.max(140,width*.17)),mini={x:width-miniSize-30,y:30,size:miniSize};
+  const g=grid(width),miniSize=Math.min(230,Math.max(120,g.span(2))),mini={x:g.x(5)+(g.span(2)-miniSize)/2,y:30,size:miniSize};
   const miniScale=mini.size/(baseRadius*2.55),move=closing?smooth((p-.5)/.15):smooth((p-.33)/.2);
   const remaining={scale:1+(miniScale-1)*move,rotation:0,tx:overview.tx+(mini.x+mini.size/2-overview.tx)*move,ty:overview.ty+(mini.y+mini.size/2-overview.ty)*move};
   const focus=camera(width,height,baseRadius,ring,1),H=ring.thickness*(ring.headUnits??HEAD_UNITS),radius=Math.max(1,ring.radius);
