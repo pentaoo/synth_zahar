@@ -12,6 +12,7 @@ import {RINGS,TAU,ringMetrics,bodyPoint,project,unproject,BodyIntent,controlRect
 import {shortcut} from './input-shortcuts.mjs?v=chains-2';
 import {ViewState,Finale} from './view-state.mjs?v=chains-2';
 import {InkMass} from './ink-physics.mjs?v=chains-2';
+import {Typewriter} from './invitations.mjs?v=chains-1';
 import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-9';
 
 const $=id=>document.getElementById(id),root=$('ouroboros'),stage=$('stage'),canvas=$('canvas'),inkButton=$('ink'),probe=$('audio-state'),panel=$('channel-panel'),minimap=$('minimap'),dialog=$('sound-dialog');
@@ -384,6 +385,17 @@ function logLine(text){
   while(scrollText.childElementCount>200)scrollText.firstElementChild.remove();
   layoutScroll();
 }
+// The empty line retypes its invitation; it rests while someone writes in it.
+const typewriter=new Typewriter(),reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
+let inviteTimer=0;
+function invite(){
+  clearTimeout(inviteTimer);
+  if(document.activeElement===spellInput||spellInput.value){spellInput.placeholder=typewriter.settle();return;}
+  const {text,delay}=typewriter.next(reducedMotion.matches);spellInput.placeholder=text;inviteTimer=setTimeout(invite,delay);
+}
+spellInput.addEventListener('focus',()=>{clearTimeout(inviteTimer);spellInput.placeholder=typewriter.settle();});
+spellInput.addEventListener('blur',()=>{inviteTimer=setTimeout(invite,1200);});
+invite();
 $('spell-form').addEventListener('submit',async e=>{
   e.preventDefault();if(casting||!spellInput.value.trim())return;
   logLine(spellInput.value.trim());await runLine();spellInput.value='';renderLexicon();
