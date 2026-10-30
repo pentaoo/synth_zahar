@@ -1,11 +1,12 @@
 :root{color-scheme:light;--paper:#fff;--ink:#000;--serif:Georgia,"Times New Roman",serif;
-  /* Six text styles. Every text on the page uses one of them. */
+  /* Seven text styles. Every text on the page uses one of them. */
   --type-title:400 28px/1.1 var(--serif);   /* Заголовок: имя кольца и змеи, заголовок окна */
   --type-large:400 24px/1.2 var(--serif);   /* Крупный: строка заклинаний, знаки ↵ и × */
   --type-lead:400 16px/1.3 var(--serif);    /* Подзаголовок: группы настроек, выбор прикосновения */
   --type-body:400 14px/1.6 var(--serif);    /* Текст: абзацы окна, подписи и теги на телефоне */
   --type-caption:400 12px/1.5 var(--serif); /* Подпись: подписи ползунков, теги, выпадающие списки, кнопки */
-  --type-micro:400 11px/1.45 var(--serif);  /* Мелкий: значения, подсказка рун, лог справа */
+  --type-micro:400 11px/1.45 var(--serif);  /* Мелкий: значения, подсказка рун */
+  --type-log:400 8px/1.5 var(--serif);      /* Лог: всё сказанное, справа */
   font:var(--type-body)}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -99,7 +100,7 @@ dialog .shortcuts{font:var(--type-caption)}
 .spell-log.overflowing{justify-content:flex-end}
 .spell-log[hidden]{display:none}
 .spell-log .scroll{flex:none;background:#fff}
-.spell-log p{margin:0;font:var(--type-micro);text-align:center;overflow-wrap:anywhere}
+.spell-log p{margin:0;font:var(--type-log);text-align:center;overflow-wrap:anywhere}
 .spell-log p span{display:block}
 /* Desktop: nothing is written on the left; what was said goes to the log. */
 [data-mobile="false"] #spell-feedback{display:none}
