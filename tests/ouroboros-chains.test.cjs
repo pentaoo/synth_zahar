@@ -118,8 +118,8 @@ test('desktop grid: seven columns, rings in the middle three, settings in the fi
     assert.ok(ritualSize(w,h)*2.3<=g.span(3)+1e-6,'the composition fits three columns');
     const c=controlRect(w,h);assert.equal(c.x,g.x(0));assert.ok(c.x+c.width<=g.x(2),'settings stay in the first two columns');
     const ring={...ringMetrics(0,ritualSize(w,h)),headAngle:0};const {mini}=presentation(w,h,ritualSize(w,h),ring,{progress:.6});
-    near(mini.x+mini.size/2,g.x(5)+g.span(2)/2,1e-6);assert.equal(mini.y,16,'the miniature tops the last two columns, 16px from the top');
-    assert.ok(mini.x>=g.x(5)-1e-6&&mini.x+mini.size<=g.x(5)+g.span(2)+1e-6&&mini.size<=234,'the miniature fits the log columns');
+    near(mini.x+mini.size/2,w/2,1e-6);assert.equal(mini.y,16,'the miniature sits top centre, 16px from the top');
+    assert.ok(mini.x+mini.size<=g.x(5)&&mini.size<=234,'the miniature stays clear of the line and log columns');
   }
 });
 

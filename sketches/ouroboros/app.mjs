@@ -4,16 +4,16 @@ import {CreatureLife} from './creature-state.mjs?v=chains-2';
 import {SPELLS,SPELL_WORDS} from './spell-book.mjs?v=chains-2';
 import {RING_NAMES,SPECIES,parseCommand,nextCell,cellLabel} from './chain-model.mjs?v=chains-2';
 import {TouchPinch} from './touch-pinch.mjs';
-import {mobileLayout,ritualSize} from './ritual-geometry.mjs?v=chains-5';
+import {mobileLayout,ritualSize} from './ritual-geometry.mjs?v=chains-6';
 import {WheelScratch} from './wheel-scratch.mjs';
 import {PinchScale,MIN_SCALE} from './pinch-scale.mjs?v=ritual-9';
 import {HandMotion,ScratchResponse,SCRATCH_INPUT} from './scratch-motion.mjs';
-import {RINGS,TAU,ringMetrics,bodyPoint,project,unproject,BodyIntent,controlRect,grid} from './body-geometry.mjs?v=chains-5';
+import {RINGS,TAU,ringMetrics,bodyPoint,project,unproject,BodyIntent,grid} from './body-geometry.mjs?v=chains-6';
 import {shortcut} from './input-shortcuts.mjs?v=chains-2';
 import {ViewState,Finale} from './view-state.mjs?v=chains-2';
 import {InkMass} from './ink-physics.mjs?v=chains-2';
 import {Typewriter} from './invitations.mjs?v=chains-2';
-import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-10';
+import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-11';
 
 const $=id=>document.getElementById(id),root=$('ouroboros'),stage=$('stage'),canvas=$('canvas'),inkButton=$('ink'),probe=$('audio-state'),panel=$('channel-panel'),minimap=$('minimap'),dialog=$('sound-dialog');
 const voicePanel=$('voice-panel'),spellLine=$('spell-line'),spellInput=$('spell-input'),feedback=$('spell-feedback'),life=new CreatureLife(),touchPinch=new TouchPinch();
@@ -282,22 +282,20 @@ function updateViewUi(scene){
   root.style.setProperty('--controls-top',Math.round(scene.mini.y+scene.mini.size+(mobile?92:16))+'px');
   root.style.setProperty('--controls-height',Math.max(85,Math.min(390,height*(height<520?.56:.64)-scene.mini.y-scene.mini.size-(mobile?100:28)))+'px');
   // The line is always there: under the circle in the overview, above the controls in the large view.
-  // Desktop overview (author's layout, 30 Oct): the right column sits flush with the
-  // screen edge; the line is inset in it at the top, the log starts 250px down.
-  // In an open ring the column moves back onto the grid (columns 6–7) under the miniature.
-  const g=grid(width),focusLine=p>.5&&finale.state==='ready',inset=Math.round(g.margin*.7);
-  const shift=Math.min(1,p*2),columnX=width-g.span(2)+(g.x(5)-width+g.span(2))*shift*shift*(3-2*shift);
+  // Desktop (author's layout, 30 Oct): the right column is grid columns 6–7 and never
+  // moves: the line is inset at its top in every view, the log starts 250px down.
+  const g=grid(width),focusLine=p>.5&&finale.state==='ready',inset=Math.round(g.margin*.7),columnX=g.x(5);
   const lineWidth=mobile?Math.min(330,width-40):Math.max(200,g.span(2)-2*inset);
-  const lineY=focusLine?(mobile?scene.mini.y+scene.mini.size+8:Math.max(20,controlRect(width,height).y-118)):(mobile?height*.77:Math.round(height*.1));
+  const lineY=mobile?(focusLine?scene.mini.y+scene.mini.size+8:height*.77):Math.round(height*.1);
   // Keep the whole line block on screen, and above the on-screen keyboard when it is open.
   const vv=window.visualViewport,visibleBottom=vv?Math.min(height,vv.offsetTop+vv.height-stage.getBoundingClientRect().top):height;
   const lineTop=Math.max(8,Math.min(lineY,visibleBottom-spellLine.offsetHeight-8));
   Object.assign(spellLine.style,{left:(mobile?(width-lineWidth)/2:columnX+inset)+'px',top:lineTop+'px',width:lineWidth+'px'});
-  // Desktop: the log runs from under the miniature's slot to 16px above the bottom.
-  const logTop=scene.mini.y+scene.mini.size;
+  // Desktop: the log runs from 250px (16 + 234) to 16px above the bottom.
+  const logTop=16+234;
   spellLog.hidden=mobile;Object.assign(spellLog.style,{left:columnX+'px',width:g.span(2)+'px',top:logTop+'px',height:Math.max(0,height-logTop-16)+'px'});
-  // Desktop: in an open ring the miniature holds the top of the column and the line steps aside.
-  spellLine.hidden=finale.state==='closing'||(!mobile&&focusLine);
+  // The line stays in place in an open ring too; the miniature sits top centre.
+  spellLine.hidden=finale.state==='closing';
   minimap.setAttribute('aria-label',mobile?'Вся композиция. Нажми, чтобы вернуться.':'Остальные кольца. Нажми, чтобы вернуться.');
   panel.hidden=p<.97||view.target===0||finale.state!=='ready';if(!voicePanel.hidden&&(p>0||finale.state!=='ready'))toggleVoice(false);minimap.hidden=!scene.miniActive||finale.state!=='ready';inkButton.hidden=p>0||finale.state!=='ready';
   root.dataset.view=p>.1?'focus':'overview';
