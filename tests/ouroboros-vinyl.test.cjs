@@ -252,3 +252,14 @@ test('a tiny unrendered wheel flick keeps both its sound and bounded throw, but 
     if(cancel)assert.ok(distance(t.p.position,at+512,t.p.length)<1e-7);else assert.ok(t.p.coastRemaining>0);
   }
 });
+
+test('paused, the hand turns the record silently and the motor stays off after release',()=>{
+  const t=transport(),start=t.p.position;
+  t.send({type:'grab'});t.send({type:'motion',velocity:3});
+  const out=t.render(512);
+  assert.ok(distance(t.p.position,start,t.p.length)>200,'the snakes move under the hand');
+  assert.ok(out.every(ch=>ch.every(v=>v===0)),'nothing sounds while paused');
+  t.send({type:'release'});t.render(2048);const rest=t.p.position;t.render(1024);
+  assert.equal(t.p.position,rest,'no motor and no throw while paused');
+  t.send({type:'play',value:true});t.render(256);assert.ok(distance(t.p.position,rest,t.p.length)>0,'music continues from the reached place');
+});

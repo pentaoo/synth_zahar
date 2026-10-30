@@ -53,8 +53,9 @@ class OuroborosVinylTransport extends AudioWorkletProcessor {
         this.pendingRelease=0;this.pendingCoastVelocity=0;this.power=0;this.cueMix=0;this.speed=0;
         this.stopCoast();this.textureLevel=0;this.textureLow=0;this.textureInput=0;this.textureOutput=0;
       }
-    }else if(data.type==='grab'&&this.playing)this.grab();
-    else if(data.type==='motion'&&this.playing&&Number.isFinite(data.velocity)){
+    }else if(data.type==='grab')this.grab();
+    // Paused, the hand still turns the record: the snakes move, nothing sounds.
+    else if(data.type==='motion'&&Number.isFinite(data.velocity)){
       if(!this.scratching)this.grab();
       this.motionTarget=Math.max(-12,Math.min(12,data.velocity));this.hold=Math.round(sampleRate*.018);this.motionAge=0;
     }else if(data.type==='release'&&this.scratching){
@@ -149,7 +150,7 @@ class OuroborosVinylTransport extends AudioWorkletProcessor {
       if(this.hold>0)this.hold--;else this.motionTarget*=this.motionDecay;
       this.motion+=(this.motionTarget-this.motion)*this.motionSmooth;
       if(this.coastRemaining>0)this.coastVelocity=this.coastStart*(this.coastRemaining/this.coastFrames)**2;
-      this.speed=this.playing?this.rate+this.motion+this.coastVelocity:0;
+      this.speed=this.playing?this.rate+this.motion+this.coastVelocity:this.motion;
       this.envelope+=((this.playing?1:0)-this.envelope)*this.levelSmooth;
       this.mode+=(this.modeTarget-this.mode)*this.modeSmooth;
       const magnitude=Math.abs(this.motion)+Math.abs(this.coastVelocity),powerTarget=this.scratching||this.coastRemaining>0?magnitude/(magnitude+1.5):0;
@@ -217,8 +218,8 @@ class OuroborosVinylTransport extends AudioWorkletProcessor {
       if(this.scales>1e-4)texture=texture*(1-this.scales)+this.scaleVoice(magnitude,noise)*this.scales*this.envelope;
       if(outputs[3]?.[0])outputs[3][0][n]=texture;
       texturePeak=Math.max(texturePeak,Math.abs(texture));peak=Math.max(peak,Math.abs(texture));
-      if(this.playing){
-        this.travelBeats+=Math.abs(this.speed)/this.beat;
+      if(this.playing||this.speed){
+        if(this.playing)this.travelBeats+=Math.abs(this.speed)/this.beat;
         const previousBeat=Math.floor(this.position/this.beat),next=this.position+this.speed;
         const boundary=this.speed>0&&Math.floor(next/this.beat)>previousBeat;
         this.position=this.mod(next);
@@ -234,7 +235,7 @@ class OuroborosVinylTransport extends AudioWorkletProcessor {
           this.cuePosition=this.position;this.cueMix=1;
           this.position=this.queued*this.length/4;this.queued=-1;this.dirty=true;
         }
-        if(this.scratching)this.strokeRendered=true;
+        if(this.scratching&&this.playing)this.strokeRendered=true;
         this.motionAge++;
         if(this.coastRemaining>0&&--this.coastRemaining===0){this.stopCoast();this.dirty=true;}
         if(this.pendingRelease>0&&--this.pendingRelease===0)this.release(this.pendingCoastVelocity);

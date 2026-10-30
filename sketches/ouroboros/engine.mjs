@@ -39,7 +39,7 @@ const driveCurve=amount=>{
 };
 const FRICTION=[110,220,82.41];
 const TRANSPORTS={
-  vinyl:{module:'./transport-vinyl-worklet.js?v=scales-1',processor:'ouroboros-vinyl-transport'},
+  vinyl:{module:'./transport-vinyl-worklet.js?v=scrub-1',processor:'ouroboros-vinyl-transport'},
   slip:{module:'./transport-worklet.js',processor:'ouroboros-transport'}
 };
 
@@ -179,8 +179,20 @@ export class OuroborosAudio {
     this.master.gain.setTargetAtTime(0,this.context.currentTime,.025);this.state={...this.state,playing:false,scratching:false,motion:0,power:0,slipMix:0,coasting:false,coastVelocity:0,texturePeak:0};this.onstate(this.state);
   }
   // The rubbed ring hums its own note: bass A2, bagpipe A3, drums E2.
-  grab(channel) {if(this.playing){if(FRICTION[channel])this.transport.port.postMessage({type:'friction',frequency:FRICTION[channel]});this.transport.port.postMessage({type:'grab'});this.setScratchSend(.22);}}
-  motion(velocity) {if(this.playing&&Number.isFinite(velocity))this.transport.port.postMessage({type:'motion',velocity});}
+  grab(channel) {
+    if(!this.transport)return;
+    if(!this.playing){this.transport.port.postMessage({type:'grab'});return;}
+    if(FRICTION[channel])this.transport.port.postMessage({type:'friction',frequency:FRICTION[channel]});this.transport.port.postMessage({type:'grab'});this.setScratchSend(.22);
+  }
+  motion(velocity) {if(this.transport&&Number.isFinite(velocity))this.transport.port.postMessage({type:'motion',velocity});}
+  // Paused, the snakes can still be turned by hand without a sound: the record
+  // moves silently and the music later continues from where it was left.
+  async prepareScrub() {
+    if(this.playing)return true;
+    try{await this.initialize();if(this.context.state!=='running')await this.context.resume();}catch{return false;}
+    if(!this.playing&&this.master){const now=this.context.currentTime;this.master.gain.cancelScheduledValues(now);this.master.gain.setValueAtTime(0,now);}
+    return !!this.transport&&this.context.state==='running';
+  }
   release({coastVelocity=0}={}) {this.transport?.port.postMessage({type:'release',coastVelocity});this.setScratchSend(1);}
   cancelScratch(){this.transport?.port.postMessage({type:this.transportKind==='vinyl'?'cancel':'release'});this.setScratchSend(1);}
   setVoiceParam(key,value){

@@ -1,4 +1,4 @@
-import {OuroborosAudio} from './engine.mjs?v=chains-5';
+import {OuroborosAudio} from './engine.mjs?v=chains-6';
 import {clamp,wrap} from './folk-score.mjs?v=ritual-10';
 import {CreatureLife} from './creature-state.mjs?v=chains-2';
 import {SPELLS,SPELL_WORDS} from './spell-book.mjs?v=chains-2';
@@ -158,7 +158,8 @@ stage.addEventListener('pointerdown',async event=>{
 });
 async function beginScratch(current){
   if(current.started)return;current.started=true;current.type='scratch';wheel.cancel();audio.cancelScratch();stage.dataset.gesture='scratch';
-  if(await start()&&gesture===current){current.ready=true;audio.grab(current.hit.channel);if(current.velocity)applyScratch(current.velocity,current.hit.angle);}
+  // Paused: the hand turns the snakes silently instead of starting the music.
+  if(await (current.wasPlaying||audio.playing?start():audio.prepareScrub())&&gesture===current){current.ready=true;audio.grab(current.hit.channel);if(current.velocity)applyScratch(current.velocity,current.hit.angle);}
 }
 stage.addEventListener('pointermove',event=>{
   if(!renderer?.scene)return;const p=coordinates(event);pointer=p;
@@ -191,7 +192,9 @@ stage.addEventListener('wheel',event=>{
   if(pinch.source){event.preventDefault();return;}
   if(!event.deltaY||gesture?.type==='scratch'||keyboard==='scratch')return;
   const hit=renderer?.hit(coordinates(event));if(!hit&&!wheel.active)return;
-  event.preventDefault();if(!audio.playing){message('Нажми пробел или коснись бездны, затем веди по телу.');return;}
+  event.preventDefault();
+  // Paused: the wheel still turns the snakes, silently, once the sound engine exists.
+  if(!audio.playing&&audio.context?.state!=='running'){audio.prepareScrub();return;}
   wheel.move({deltaY:event.deltaY,deltaMode:event.deltaMode,pageHeight:height,timeStamp:eventTime(event),inside:!!hit,angle:hit?.angle||0,momentum:typeof event.momentum==='boolean'?event.momentum:undefined});
 },{passive:false});
 stage.addEventListener('gesturestart',e=>{if(finale.state==='ready'){e.preventDefault();pinch.safariStart();}},{passive:false});
@@ -231,7 +234,7 @@ canvas.addEventListener('keydown',e=>{
 });
 canvas.addEventListener('keydown',async e=>{
   if(!['ArrowLeft','ArrowRight'].includes(e.key)||finale.state!=='ready')return;e.preventDefault();
-  if(!keyboard){wheel.cancel();keyboard='scratch';if(!await start()||keyboard!=='scratch')return;audio.grab(view.selected);}
+  if(!keyboard){wheel.cancel();keyboard='scratch';if(!await (audio.playing?start():audio.prepareScrub())||keyboard!=='scratch')return;audio.grab(view.selected);}
   applyScratch(e.key==='ArrowRight'?3.5:-3.5,-Math.PI/2);
 });
 canvas.addEventListener('keyup',e=>{if(['ArrowLeft','ArrowRight'].includes(e.key))endGesture();});
