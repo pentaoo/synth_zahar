@@ -143,17 +143,17 @@ test('«Чешуя»: rubbing ducks the record, clicks the scales and bows the r
   assert.ok(Math.abs(rms(after[0])-rms(plain[0]))<1e-3,'music back at full level');
 });
 
-test('the empty line retypes forty invitations one character at a time',async()=>{
+test('the empty line retypes the chosen invitations one character at a time',async()=>{
   const {INVITATIONS,Typewriter}=await import(`${root}/invitations.mjs`);
-  assert.equal(INVITATIONS.length,40);assert.equal(new Set(INVITATIONS).size,40);
+  const N=INVITATIONS.length;assert.equal(N,5);assert.equal(new Set(INVITATIONS).size,N);
   const t=new Typewriter(INVITATIONS,()=>.5),seen=[INVITATIONS[0]];let last=INVITATIONS[0];
-  for(let n=0;n<20000&&seen.length<41;n++){
+  for(let n=0;n<20000&&seen.length<N+1;n++){
     const {text,delay}=t.next();assert.ok(delay>=0);
     assert.ok(Math.abs([...text].length-[...last].length)<=1,'one character at a time');
     if(text===t.target&&!t.erasing&&text!==seen.at(-1))seen.push(text);
     last=text;
   }
-  assert.equal(new Set(seen.slice(0,40)).size,40,'each phrase once per round');
+  assert.equal(new Set(seen.slice(0,N)).size,N,'each phrase once per round');
   t.next();t.next();assert.equal(t.settle(),t.target);assert.equal(t.text,t.target);
   const r=new Typewriter(INVITATIONS,()=>.5),a=r.next(true).text;assert.ok(INVITATIONS.includes(a),'reduced motion swaps whole phrases');
 });

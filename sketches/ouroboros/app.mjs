@@ -12,7 +12,7 @@ import {RINGS,TAU,ringMetrics,bodyPoint,project,unproject,BodyIntent,controlRect
 import {shortcut} from './input-shortcuts.mjs?v=chains-2';
 import {ViewState,Finale} from './view-state.mjs?v=chains-2';
 import {InkMass} from './ink-physics.mjs?v=chains-2';
-import {Typewriter} from './invitations.mjs?v=chains-1';
+import {Typewriter} from './invitations.mjs?v=chains-2';
 import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-9';
 
 const $=id=>document.getElementById(id),root=$('ouroboros'),stage=$('stage'),canvas=$('canvas'),inkButton=$('ink'),probe=$('audio-state'),panel=$('channel-panel'),minimap=$('minimap'),dialog=$('sound-dialog');
@@ -279,19 +279,20 @@ function updateViewUi(scene){
   root.style.setProperty('--controls-top',Math.round(scene.mini.y+scene.mini.size+(mobile?92:16))+'px');
   root.style.setProperty('--controls-height',Math.max(85,Math.min(390,height*(height<520?.56:.64)-scene.mini.y-scene.mini.size-(mobile?100:28)))+'px');
   // The line is always there: under the circle in the overview, above the controls in the large view.
-  // Desktop: the line lives in the first two grid columns, the log in the last two.
-  const g=grid(width),lineWidth=mobile?Math.min(330,width-40):Math.max(240,g.span(2));
-  const focusLine=p>.5&&finale.state==='ready';
-  // Desktop overview: the line takes the miniature's place at the top of the last two columns.
-  const lineY=focusLine?(mobile?scene.mini.y+scene.mini.size+8:Math.max(20,controlRect(width,height).y-118)):(mobile?height*.77:16);
+  // Desktop overview (author's layout, 30 Oct): the right column sits flush with the
+  // screen edge; the line is inset in it at the top, the log starts 250px down.
+  // In an open ring the column moves back onto the grid (columns 6–7) under the miniature.
+  const g=grid(width),focusLine=p>.5&&finale.state==='ready',inset=Math.round(g.margin*.7);
+  const shift=Math.min(1,p*2),columnX=width-g.span(2)+(g.x(5)-width+g.span(2))*shift*shift*(3-2*shift);
+  const lineWidth=mobile?Math.min(330,width-40):Math.max(200,g.span(2)-2*inset);
+  const lineY=focusLine?(mobile?scene.mini.y+scene.mini.size+8:Math.max(20,controlRect(width,height).y-118)):(mobile?height*.77:Math.round(height*.1));
   // Keep the whole line block on screen, and above the on-screen keyboard when it is open.
   const vv=window.visualViewport,visibleBottom=vv?Math.min(height,vv.offsetTop+vv.height-stage.getBoundingClientRect().top):height;
   const lineTop=Math.max(8,Math.min(lineY,visibleBottom-spellLine.offsetHeight-8));
-  Object.assign(spellLine.style,{left:(mobile?(width-lineWidth)/2:g.x(5))+'px',top:lineTop+'px',width:lineWidth+'px'});
-  // Desktop: the log runs down the last two columns from under the line (overview)
-  // or the miniature (open ring) to 16px above the bottom.
-  const logTop=focusLine?scene.mini.y+scene.mini.size:lineTop+spellLine.offsetHeight+16;
-  spellLog.hidden=mobile;Object.assign(spellLog.style,{left:g.x(5)+'px',width:g.span(2)+'px',top:logTop+'px',height:Math.max(0,height-logTop-16)+'px'});
+  Object.assign(spellLine.style,{left:(mobile?(width-lineWidth)/2:columnX+inset)+'px',top:lineTop+'px',width:lineWidth+'px'});
+  // Desktop: the log runs from under the miniature's slot to 16px above the bottom.
+  const logTop=scene.mini.y+scene.mini.size;
+  spellLog.hidden=mobile;Object.assign(spellLog.style,{left:columnX+'px',width:g.span(2)+'px',top:logTop+'px',height:Math.max(0,height-logTop-16)+'px'});
   // Desktop: in an open ring the miniature holds the top of the column and the line steps aside.
   spellLine.hidden=finale.state==='closing'||(!mobile&&focusLine);
   minimap.setAttribute('aria-label',mobile?'Вся композиция. Нажми, чтобы вернуться.':'Остальные кольца. Нажми, чтобы вернуться.');
