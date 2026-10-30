@@ -72,7 +72,7 @@ export function presentation(width,height,baseRadius,ring,viewState){
   const span=scale=>Math.hypot(width,height)/scale+ring.thickness*4,departGate=(viewState.departAngle??ring.headAngle)+H/radius;
   let view=overview,path=0,visible=true,angle=ring.headAngle,stage='overview';
   if(!closing){
-    if(p>0&&p<.40){path={kind:'depart',gate:departGate,distance:smooth(p/.40)*(ring.length+H+span(1))};stage='depart';}
+    if(p>0&&p<.40){path={kind:'depart',gate:departGate,distance:smooth(p/.40)*(Math.max(ring.length,ring.fullLength||0)+H+span(1))};stage='depart';}
     else if(p>=.40&&p<.54){visible=false;stage='transfer';}
     else if(p>=.54&&p<.94){
       view=focus;const clear=width/focus.scale+ring.thickness*4;
@@ -80,7 +80,7 @@ export function presentation(width,height,baseRadius,ring,viewState){
     }else if(p>=.94){view=focus;angle=-Math.PI/2+angleDelta(viewState.focusAngle,-Math.PI/2)*smooth((p-.94)/.06);stage='focus';}
   }else{
     const c=1-p;
-    if(c<.35){view=focus;path={kind:'depart',gate:departGate,distance:(c/.35)**3*(ring.length+H+span(focus.scale))};stage='return-depart';}
+    if(c<.35){view=focus;path={kind:'depart',gate:departGate,distance:(c/.35)**3*(Math.max(ring.length,ring.fullLength||0)+H+span(focus.scale))};stage='return-depart';}
     else if(c<.5){visible=false;stage='transfer';}
     else{const clear=span(1);path={kind:'arrive',gate:viewState.arriveGate??ring.headAngle,distance:-clear+smooth((c-.5)/.5)*(clear+TAU*ring.radius+H)};stage='return';}
   }

@@ -1,21 +1,21 @@
-import {OuroborosAudio} from './engine.mjs?v=chains-1';
+import {OuroborosAudio} from './engine.mjs?v=chains-2';
 import {clamp,wrap} from './folk-score.mjs?v=ritual-10';
-import {CreatureLife} from './creature-state.mjs?v=chains-1';
-import {SPELLS} from './spell-book.mjs?v=chains-1';
-import {RING_NAMES,SPECIES,parseCommand,nextCell,cellLabel} from './chain-model.mjs?v=chains-1';
+import {CreatureLife} from './creature-state.mjs?v=chains-2';
+import {SPELLS,SPELL_WORDS} from './spell-book.mjs?v=chains-2';
+import {RING_NAMES,SPECIES,parseCommand,nextCell,cellLabel} from './chain-model.mjs?v=chains-2';
 import {TouchPinch} from './touch-pinch.mjs';
-import {mobileLayout,ritualSize} from './ritual-geometry.mjs?v=chains-1';
+import {mobileLayout,ritualSize} from './ritual-geometry.mjs?v=chains-2';
 import {WheelScratch} from './wheel-scratch.mjs';
 import {PinchScale,MIN_SCALE} from './pinch-scale.mjs?v=ritual-9';
 import {HandMotion,ScratchResponse,SCRATCH_INPUT} from './scratch-motion.mjs';
-import {RINGS,TAU,ringMetrics,bodyPoint,project,unproject,BodyIntent,controlRect} from './body-geometry.mjs?v=chains-1';
-import {shortcut} from './input-shortcuts.mjs?v=chains-1';
-import {ViewState,Finale} from './view-state.mjs?v=chains-1';
-import {InkMass} from './ink-physics.mjs?v=chains-1';
-import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-1';
+import {RINGS,TAU,ringMetrics,bodyPoint,project,unproject,BodyIntent,controlRect} from './body-geometry.mjs?v=chains-2';
+import {shortcut} from './input-shortcuts.mjs?v=chains-2';
+import {ViewState,Finale} from './view-state.mjs?v=chains-2';
+import {InkMass} from './ink-physics.mjs?v=chains-2';
+import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-2';
 
 const $=id=>document.getElementById(id),root=$('ouroboros'),stage=$('stage'),canvas=$('canvas'),inkButton=$('ink'),probe=$('audio-state'),panel=$('channel-panel'),minimap=$('minimap'),dialog=$('sound-dialog');
-const spellLine=$('spell-line'),spellInput=$('spell-input'),feedback=$('spell-feedback'),life=new CreatureLife(),touchPinch=new TouchPinch();
+const voicePanel=$('voice-panel'),spellLine=$('spell-line'),spellInput=$('spell-input'),feedback=$('spell-feedback'),life=new CreatureLife(),touchPinch=new TouchPinch();
 let lastIncantation=null,casting=false,selectedUid='',pendingLead='',pointer={x:0,y:0};
 const audible={},pendingWrites=[];
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
@@ -200,7 +200,7 @@ window.addEventListener('blur',pause);document.addEventListener('visibilitychang
 window.addEventListener('keydown',event=>{
   const inLine=event.target===spellInput,nativeText=event.target.matches('input:not([type=range]),textarea,select,[contenteditable=true]');
   if(inLine){
-    if(event.code==='Escape'){event.preventDefault();event.stopPropagation();if(spellInput.value){spellInput.value='';spellInput.removeAttribute('aria-invalid');}else{spellInput.blur();closeView();}}
+    if(event.code==='Escape'){event.preventDefault();event.stopPropagation();if(spellInput.value){spellInput.value='';spellInput.removeAttribute('aria-invalid');}else{spellInput.blur();if(!voicePanel.hidden)toggleVoice(false);else closeView();}}
     return;
   }
   // Typing anywhere writes into the line: names, words and runic notation.
@@ -212,7 +212,7 @@ window.addEventListener('keydown',event=>{
   const command=shortcut({code:event.code,key:event.key,ctrlKey:event.ctrlKey,metaKey:event.metaKey,altKey:event.altKey,tag:event.target.tagName,type:event.target.type,dialog:dialog.open});
   if(!command)return;
   event.preventDefault();
-  if(command==='back'){closeView();return;}
+  if(command==='back'){if(!voicePanel.hidden){toggleVoice(false);return;}closeView();return;}
   if(event.repeat)return;
   if(command==='play'){togglePlay();return;}
   if(command==='service'){endPinch();cancelGesture();dialog.showModal();return;}
@@ -281,7 +281,7 @@ function updateViewUi(scene){
   Object.assign(spellLine.style,{left:(focusLine&&!mobile?Math.max(28,width*.032):(width-lineWidth)/2)+'px',top:lineY+'px',width:lineWidth+'px'});
   spellLine.hidden=finale.state==='closing';
   minimap.setAttribute('aria-label',mobile?'Вся композиция. Нажми, чтобы вернуться.':'Остальные кольца. Нажми, чтобы вернуться.');
-  panel.hidden=p<.97||view.target===0||finale.state!=='ready';minimap.hidden=!scene.miniActive||finale.state!=='ready';inkButton.hidden=p>0||finale.state!=='ready';
+  panel.hidden=p<.97||view.target===0||finale.state!=='ready';if(!voicePanel.hidden&&(p>0||finale.state!=='ready'))toggleVoice(false);minimap.hidden=!scene.miniActive||finale.state!=='ready';inkButton.hidden=p>0||finale.state!=='ready';
   root.dataset.view=p>.1?'focus':'overview';
   if(lastSelected!==view.selected){lastSelected=view.selected;const ring=chains.rings[view.selected];view.leadUid=ring.some(s=>s.uid===pendingLead)?pendingLead:ring[0]?.uid||'';if(!ring.some(s=>s.uid===selectedUid))selectedUid=view.leadUid;populateControls();}
   Object.assign(minimap.style,{left:scene.mini.x+'px',top:scene.mini.y+'px',width:scene.mini.size+'px',height:scene.mini.size+'px'});
@@ -305,7 +305,8 @@ function frame(now){
   const ringClocks=clocks(now),rates=ringClocks.map(c=>c?TAU*model.speed/c.seconds:0),sounding=soundingUids(ringClocks);
   const uids=chains.all.map(s=>s.uid);
   const creatureStates=life.update(now/1000,dt,{snakes:uids,active:sounding,playing:audio.playing,pointer:document.activeElement===spellInput?{x:width*.5,y:height*.85}:pointer,eyes:renderer?.scene?.eyes,selected:selectedUid,contact:gesture?.hit?.uid||'',spells:audio.spells,reduced:reduced.matches});
-  const scene=renderer?.render({dt,life:creatureStates,baseRadius,compression:pinch.scale,chains:chains.rings,clocks:reduced.matches?[]:ringClocks,rates,selectedUid,audible,viewState:view,ink,scratch:{angle:scratchVisual.angle,strength:scratchVisual.strengthAt(now),direction:scratchVisual.direction},finale:finale.progress,finalePose:finale.pose,reduced:reduced.matches});
+  const stageBox=stage.getBoundingClientRect(),avoid=[spellLine,panel,voicePanel,minimap].filter(e=>!e.hidden).map(e=>{const r=e.getBoundingClientRect();return {x:r.left-stageBox.left-8,y:r.top-stageBox.top-8,w:r.width+16,h:r.height+16};});
+  const scene=renderer?.render({dt,avoid,life:creatureStates,baseRadius,compression:pinch.scale,chains:chains.rings,clocks:reduced.matches?[]:ringClocks,rates,selectedUid,audible,viewState:view,ink,scratch:{angle:scratchVisual.angle,strength:scratchVisual.strengthAt(now),direction:scratchVisual.direction},finale:finale.progress,finalePose:finale.pose,reduced:reduced.matches});
   if(scene){
     updateViewUi(scene);
     if(finale.state==='ended'){const x=renderer.ctx;x.fillStyle='#000';x.beginPath();x.arc(width/2,height*.51,1.2,0,TAU);x.fill();}
@@ -363,11 +364,12 @@ function turnRune(hit,step){
 $('spell-form').addEventListener('submit',async e=>{
   e.preventDefault();if(casting)return;
   const text=spellInput.value,focus=view.progress>.5&&view.target===1,snake=snakeOf(selectedUid);
+  if(/^\s*голос\s*$/i.test(text)){spellInput.value='';toggleVoice(true);return;}
   const command=parseCommand(text,{spells:SPELLS,channel:focus&&snake?snake.channel:-1});
   if(command.type==='empty')return;
   if(command.type==='unknown'){
     feedback.dataset.kind='';spellInput.setAttribute('aria-invalid','true');
-    feedback.textContent=focus?'Не узнаю. Имя змеи, слово (Свод, Ярость, Расщепление, Снять) или руны: 1 2 3 · — 5':'Не узнаю. Имена: '+SPECIES.map(s=>s.name).join(', ')+'. Слова: Свод, Ярость, Расщепление, Снять.';
+    feedback.textContent=focus?'Не узнаю. Имя змеи, слово ('+SPELL_WORDS+') или руны: 1 2 3 · — 5':'Не узнаю. Имена: '+SPECIES.map(s=>s.name).join(', ')+'. Слова: '+SPELL_WORDS+'. «голос» — настройки голоса.';
     return;
   }
   spellInput.removeAttribute('aria-invalid');spellInput.value='';feedback.dataset.kind='';
@@ -379,7 +381,26 @@ $('spell-form').addEventListener('submit',async e=>{
   const result=audio.castSpell(command.spell.word,{targets:to.targets,voice:to.voice});
   if(result.ok){lastIncantation={key:result.spell.key,id:result.id,targets:result.targets,word:result.spell.word,recipient:to.label};feedback.dataset.kind='spell';feedback.textContent=result.spell.rune+' '+result.spell.word+' · '+to.label;probe.dataset.lastCast=JSON.stringify({id:result.id,key:result.spell.key,targets:result.targets});}
 });
-for(const b of document.querySelectorAll('[data-word]'))b.addEventListener('click',()=>{spellInput.value=b.dataset.word;spellInput.focus({preventScroll:true});});
+// Hints under the line: three names, every word, and the voice.
+$('spell-lexicon').replaceChildren(...[...['Нить','Корень','Кость'],null,...SPELLS.map(s=>s.word),'голос'].map(word=>{
+  if(!word){const gap=document.createElement('span');gap.className='lexicon-gap';return gap;}
+  const b=document.createElement('button');b.type='button';b.textContent=word;
+  b.addEventListener('click',()=>{if(word==='голос'){toggleVoice(true);return;}spellInput.value=word;spellInput.focus({preventScroll:true});});return b;}));
+// ——— Voice of the abyss ———
+const voiceFormat={level:v=>Math.round(v/.6*100)+'%',pitch:v=>'×'+v.toFixed(2),tone:v=>Math.round(v)+' Гц',robot:v=>Math.round(v*100)+'%',carrier:v=>Math.round(v)+' Гц'};
+function populateVoice(){
+  const v=audio.voiceSettings;
+  for(const input of voicePanel.querySelectorAll('[data-voice]')){const key=input.dataset.voice;input.value=v[key];voicePanel.querySelector('[data-voice-value="'+key+'"]').textContent=voiceFormat[key](v[key]);}
+  $('voice-every').value=String(v.every);probe.dataset.voiceSettings=JSON.stringify(v);
+}
+function toggleVoice(open=voicePanel.hidden){
+  if(open&&(view.progress>0||finale.state!=='ready')){if(view.progress>0)closeView();}
+  voicePanel.hidden=!open;root.dataset.voicePanel=String(open);if(open){populateVoice();voicePanel.querySelector('[data-voice]').focus({preventScroll:true});}
+}
+for(const input of voicePanel.querySelectorAll('[data-voice]'))input.addEventListener('input',()=>{audio.setVoiceParam(input.dataset.voice,Number(input.value));populateVoice();});
+$('voice-every').addEventListener('change',e=>{audio.setVoiceParam('every',Number(e.target.value));populateVoice();});
+$('voice-close').addEventListener('click',()=>toggleVoice(false));
+$('voice-say').addEventListener('click',async()=>{if(await start())audio.sayVoice();});
 window.visualViewport?.addEventListener('resize',()=>{root.style.height=window.visualViewport.height+'px';resize();});
 try{
   renderer=new EngravingRenderer(canvas,$('ink-canvas'));new ResizeObserver(resize).observe(stage);resize();

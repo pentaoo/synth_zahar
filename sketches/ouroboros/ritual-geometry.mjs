@@ -1,4 +1,4 @@
-import {TAU,ATLAS,HEAD_UNITS,MOUTH_UNITS,bodyPoint,presentation,project,unproject} from './body-geometry.mjs?v=chains-1';
+import {TAU,ATLAS,HEAD_UNITS,MOUTH_UNITS,bodyPoint,presentation,project,unproject} from './body-geometry.mjs?v=chains-2';
 import {CREATURES,PHRASE_BEATS} from './ritual-model.mjs';
 import {clamp,angleDelta} from './score.mjs';
 export const mobileLayout=(w,h)=>w<700||(h<520&&w<1000);
@@ -24,16 +24,19 @@ export function chainShares(snakes,weights){
   const w=snakes.map(s=>Math.max(0,weights?.[s.uid]??1)),total=w.reduce((a,b)=>a+b,0)||1;
   let sum=0;return snakes.map((s,i)=>{const share=w[i]/total,start=sum;sum+=share;return {uid:s.uid,start,share};});
 }
-export function chainCreatures(ring,snakes,lead=0,skins={},weights=null){
+// stretch 0..1: in flight a pinched snake grows back to its full material
+// length instead of showing the part it had swallowed as a cut tail.
+export function chainCreatures(ring,snakes,lead=0,skins={},weights=null,stretch=0){
   const n=snakes.length;if(!n)return [];
   const shares=chainShares(snakes,weights),order=[...Array(n).keys()].map(k=>(k+lead)%n);let fraction=0;
   return order.map((index,k)=>{
     const snake=snakes[index],skin=skins[snake.id]||ATLAS,nextSkin=skins[snakes[order[(k+1)%n]].id]||ATLAS;
     const bodyHeight=skin.bottom-skin.top,headUnits=skin.neck/bodyHeight*skin.width/skin.height;
     const mouth=n>1||!snake.ghost?(nextSkin.neck-nextSkin.gullet)/(nextSkin.bottom-nextSkin.top)*nextSkin.width/nextSkin.height:0;
-    const share=shares[index].share,offset=fraction*TAU*ring.radius;fraction+=share;
+    const radius=ring.radius+((ring.baseRadius*ring.ratio||ring.radius)-ring.radius)*Math.max(0,Math.min(1,stretch));
+    const share=shares[index].share,offset=fraction*TAU*radius;fraction+=share;
     return {...ring,id:snake.id,uid:snake.uid,channel:ring.index,part:index,name:snake.name,cells:snake.cells,ghost:!!snake.ghost,share,offset,headUnits,skin,
-      length:Math.max(0,TAU*ring.radius*share-mouth*ring.thickness),
+      length:Math.max(0,TAU*radius*share-mouth*ring.thickness),
       fullLength:TAU*ring.baseRadius*ring.ratio*share-mouth*ring.baseWidth,
       tileLength:ring.baseWidth*(skin.end-skin.neck)/bodyHeight*skin.width/skin.height};
   });
@@ -52,7 +55,7 @@ export function ritualPresentation(w,h,base,ring,state){
   const focus={scale:zoom,rotation:0,tx:w/2,ty:h*.77+ring.radius*zoom+(state.spelling&&h<520?35:0)};
   let view=(closing?p>.65:p>=.54)?focus:overview,path=layout.path,angle=layout.angle;const H=ring.thickness*(ring.headUnits??HEAD_UNITS);
   if(layout.stage==='arrive'){const clear=w/zoom+ring.thickness*4;path={kind:'arrive',distance:-clear+smooth((p-.54)/.40)*(clear+TAU*ring.radius+H)};}
-  if(layout.stage==='return-depart'){const clear=Math.hypot(w,h)/zoom+ring.thickness*4;path={...path,distance:((1-p)/.35)**3*(ring.length+H+clear)};}
+  if(layout.stage==='return-depart'){const clear=Math.hypot(w,h)/zoom+ring.thickness*4;path={...path,distance:((1-p)/.35)**3*(Math.max(ring.length,ring.fullLength||0)+H+clear)};}
   // Keep the leading eye in the large bottom arc when the camera settles.
   if(!closing&&p>=.94)angle=-Math.PI/2+angleDelta(state.focusAngle,-Math.PI/2)*smooth((p-.94)/.06);
   return {...layout,overview,remaining,view,path,angle,mini,move,mobile:true};

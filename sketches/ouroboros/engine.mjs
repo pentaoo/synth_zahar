@@ -1,11 +1,11 @@
 import {renderScore,clamp,DEFAULT_WAVES,BPM} from './folk-score.mjs?v=ritual-10';
-import {SpellBook} from './spell-book.mjs';
+import {SpellBook} from './spell-book.mjs?v=chains-2';
 import {CREATURES} from './ritual-model.mjs';
-import {createSpellRack} from './spell-rack.mjs';
-import {RitualVoice} from './ritual-voice.mjs';
+import {createSpellRack,silentSpells} from './spell-rack.mjs?v=chains-2';
+import {RitualVoice,voiceDefaults,VOICE_RANGES} from './ritual-voice.mjs?v=chains-2';
 import {channelDefaults,channelValue} from './channel-state.mjs';
-import {Chains} from './chain-model.mjs?v=chains-1';
-import {renderRing,masterStems} from './chain-score.mjs?v=chains-1';
+import {Chains} from './chain-model.mjs?v=chains-2';
+import {renderRing,masterStems} from './chain-score.mjs?v=chains-2';
 
 // One persistent worker renders ring buffers; stale results are dropped by key.
 class RingRenderer{
@@ -46,7 +46,7 @@ export class OuroborosAudio {
   constructor(onstate=()=>{},{transport='vinyl'}={}) {
     this.transportKind=transport==='slip'?'slip':'vinyl';
     this.channelSettings=channelDefaults();this.inkMacro=null;this.spells=new SpellBook();this.phraseAudio=true;this.voiceError='';
-    this.chains=new Chains();this.ringKeys=['','',''];this.ringOrder=[new Map(),new Map(),new Map()];this.ringRenderer=new RingRenderer();this.chainMode=this.transportKind==='vinyl';
+    this.voiceSettings=voiceDefaults();this.chains=new Chains();this.ringKeys=['','',''];this.ringOrder=[new Map(),new Map(),new Map()];this.ringRenderer=new RingRenderer();this.chainMode=this.transportKind==='vinyl';
     this.channelSettings[0].wave=DEFAULT_WAVES[0];this.channelSettings[1].wave=DEFAULT_WAVES[1];
     this.onstate=onstate;this.waves=[...DEFAULT_WAVES];this.playing=false;this.ready=null;this.rate=1;this.scratchMode='vinyl';this.playIntent=0;
     this.state={phase:0,backgroundPhase:0,speed:0,rate:1,peak:0,motion:0,power:0,slipMix:0,modeMix:0,playing:false,scratching:false,queued:-1};this.ink=null;
@@ -66,7 +66,7 @@ export class OuroborosAudio {
       const outputChannelCount=Array(this.transportKind==='vinyl'?10:9).fill(1);
       this.transport=new AudioWorkletNode(this.context,definition.processor,{numberOfInputs:0,numberOfOutputs:outputChannelCount.length,outputChannelCount});
       this.buildGraph();
-      if(this.voiceRack){this.voice=new RitualVoice(this.context,this.voiceRack.input);
+      if(this.voiceRack){this.voice=new RitualVoice(this.context,this.voiceRack.input);this.voice.configure(this.voiceSettings);
       await this.voice.load().catch(error=>{this.voiceError=error.message;});}
       await new Promise(resolve=>{
         this.transport.port.onmessage=({data})=>{
@@ -158,7 +158,7 @@ export class OuroborosAudio {
     return Promise.all(jobs);
   }
   updateSpells(){
-    this.ringRacks?.forEach((rack,i)=>{const snake=this.activeSnake(i);rack.apply(snake?this.spells.values(snake.uid):{vault:0,rage:0,split:0});});
+    this.ringRacks?.forEach((rack,i)=>{const snake=this.activeSnake(i);rack.apply(snake?this.spells.values(snake.uid):silentSpells());});
     this.phraseRacks?.forEach((rack,i)=>rack.apply(this.spells.values(CREATURES[i].id)));
     this.voiceRack?.apply(this.spells.allVoiceValues());
     this.inkRack?.apply(this.spells.allVoiceValues());
@@ -181,6 +181,11 @@ export class OuroborosAudio {
   motion(velocity) {if(this.playing&&Number.isFinite(velocity))this.transport.port.postMessage({type:'motion',velocity});}
   release({coastVelocity=0}={}) {this.transport?.port.postMessage({type:'release',coastVelocity});this.setScratchSend(1);}
   cancelScratch(){this.transport?.port.postMessage({type:this.transportKind==='vinyl'?'cancel':'release'});this.setScratchSend(1);}
+  setVoiceParam(key,value){
+    const range=VOICE_RANGES[key];if(!range||!Number.isFinite(value))return false;
+    this.voiceSettings[key]=Math.max(range[0],Math.min(range[1],value));this.voice?.configure(this.voiceSettings);return true;
+  }
+  sayVoice(){return this.voice?.say(this.voice.recitative++%2?'recitative-b':'recitative-a')||false;}
   getChannelState(index){return this.channelSettings[index]?{...this.channelSettings[index]}:null;}
   setChannelParam(index,key,value){
     if(!Number.isInteger(index)||!this.channelSettings[index])return false;
@@ -230,6 +235,7 @@ export class OuroborosAudio {
     this.rate=clamp(value,.25,4);
     this.transport?.port.postMessage({type:'rate',value:this.rate});
     if(this.channels)for(const channel of this.channels)channel.delay.delayTime.setTargetAtTime(60/BPM*.75/this.rate,this.context.currentTime,.06);
+    for(const rack of [...(this.ringRacks||[]),...(this.phraseRacks||[]),this.voiceRack,this.inkRack])rack?.echoDelay?.delayTime.setTargetAtTime(60/BPM*.75/this.rate,this.context.currentTime,.06);
   }
   async changeWave(channel,wave) {
     if(channel<0||channel>1||!['sine','triangle','sawtooth','square'].includes(wave))return;

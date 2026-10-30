@@ -7,8 +7,8 @@
   <meta name="description" content="Змеи-фразы в трёх кольцах, одна пластинка. Уроборос — живой инструмент из гравюры и чернил.">
   <title>Уроборос — кольца змей</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='14' fill='none' stroke='%23111' stroke-width='4'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./ouroboros.css?v=chains-1">
-  <script type="module" src="./app.mjs?v=chains-1"></script>
+  <link rel="stylesheet" href="./ouroboros.css?v=chains-2">
+  <script type="module" src="./app.mjs?v=chains-2"></script>
 </head>
 <body>
 <main class="instrument" id="ouroboros" aria-label="Музыкальный инструмент Уроборос">
@@ -20,9 +20,26 @@
   <button type="button" id="minimap" class="minimap" aria-label="Остальные кольца. Нажми, чтобы вернуться." hidden></button>
   <section id="spell-line" class="spell-line" aria-label="Строка: имя змеи, слово или руны">
     <form id="spell-form" autocomplete="off"><input id="spell-input" name="incantation" aria-label="Имя змеи, слово-заклинание, «убрать имя» или руны выбранной змеи" placeholder="Имя змеи или слово…" enterkeyhint="send" autocapitalize="off" spellcheck="false"><button type="submit" aria-label="Произнести">↵</button></form>
-    <div class="spell-lexicon" aria-label="Подсказки"><button type="button" data-word="Нить">Нить</button><button type="button" data-word="Корень">Корень</button><button type="button" data-word="Кость">Кость</button><span aria-hidden="true">·</span><button type="button" data-word="Свод">Свод</button><button type="button" data-word="Ярость">Ярость</button><button type="button" data-word="Расщепление">Расщепление</button><button type="button" data-word="Снять">Снять</button></div>
+    <div class="spell-lexicon" id="spell-lexicon" aria-label="Подсказки"></div>
     <p id="spell-feedback" role="status" aria-live="polite"></p>
   </section>
+  <aside id="voice-panel" class="channel-panel voice-panel" aria-labelledby="voice-title" hidden>
+    <div class="channel-title"><h2 id="voice-title">Голос бездны</h2><button id="voice-close" type="button" class="panel-close" aria-label="Закрыть настройки голоса">×</button></div>
+    <p class="rune-help">Голос робота читает речитатив из бездны и произносит слова-заклинания. Слова действуют и на него, когда звучат на весь круг.</p>
+    <fieldset><legend>Голос</legend>
+      <label>Громкость<output data-voice-value="level"></output><input type="range" data-voice="level" aria-label="Громкость голоса" min="0" max=".6" step=".01"></label>
+      <label>Высота<output data-voice-value="pitch"></output><input type="range" data-voice="pitch" aria-label="Высота голоса" min=".6" max="1.4" step=".01"></label>
+      <label>Тембр<output data-voice-value="tone"></output><input type="range" data-voice="tone" aria-label="Тембр голоса, полоса формант" min="350" max="3200" step="10"></label>
+    </fieldset>
+    <fieldset><legend>Робот</legend>
+      <label>Роботизация<output data-voice-value="robot"></output><input type="range" data-voice="robot" aria-label="Насколько голос роботизирован" min="0" max="1" step=".01"></label>
+      <label>Гул<output data-voice-value="carrier"></output><input type="range" data-voice="carrier" aria-label="Частота кольцевой модуляции" min="20" max="140" step="1"></label>
+    </fieldset>
+    <fieldset><legend>Речитатив</legend>
+      <label class="choice-row">Как часто<select id="voice-every" aria-label="Как часто звучит речитатив"><option value="8">Каждые 8 долей</option><option value="16">Каждые 16 долей</option><option value="32">Каждые 32 доли</option><option value="0">Молчать</option></select></label>
+      <button id="voice-say" type="button" class="text-button">Сказать сейчас</button>
+    </fieldset>
+  </aside>
   <aside id="channel-panel" class="channel-panel" aria-labelledby="channel-title" hidden>
     <div class="channel-title"><h2 id="channel-title">Волынка</h2></div>
     <div id="phrase-choices" class="phrase-choices" role="group" aria-label="Змеи кольца: чья надпись видна"></div>
@@ -54,7 +71,7 @@
   <p id="transport-description">После сильного скролла тело немного докрутится. Музыка продолжится с достигнутого места. Любое кольцо ведёт всю пластинку.</p>
   <p>Pinch сжимает кольца и ускоряет их общий ход. У предела продолжи сжатие, чтобы завершить круг. Короткий клик открывает кольцо; миниатюра и Escape возвращают общий вид.</p>
   <p>Вначале звучит одна змея — Ветер, волынка. Впиши имя змеи, и она прилетит в своё кольцо: Ветер и Нить — волынка, Корень и Камень — бас, Кость и Кремень — барабаны. Имя ещё раз — ещё одна такая же змея; «убрать имя» — одна улетает. Кольцо из меньшего числа змей звучит короче и вращается быстрее. Бас берёт ключевые ноты волынки, а низкий тянущийся звук волынки (дрон: ноты ля 110 и 220 Гц) живёт в её кольце.</p>
-  <p>Слова Свод, Ярость, Расщепление, Снять в общем виде действуют на весь круг, в открытом кольце — на выбранную змею; «кольцо Ярость» — на всё кольцо, «всё Свод» — везде. Речитатив звучит из бездны в центре. На телефоне короткое касание бездны — играть или пауза. Два пальца сжимают, один скретчит.</p>
+  <p>Слова Свод, Ярость, Расщепление, Эхо, Туман, Лёд, Дрожь и Снять в общем виде действуют на весь круг, в открытом кольце — на выбранную змею; «кольцо Ярость» — на всё кольцо, «всё Свод» — везде. Речитатив звучит из бездны в центре; «голос» в строке открывает его настройки. На телефоне короткое касание бездны — играть или пауза. Два пальца сжимают, один скретчит.</p>
   <details><summary>Устройство звука</summary><p class="routing">Каждое кольцо — своя петля из фраз змей по 8 долей → своя ветвь заклинаний<br>↓ три общих канала: Бас / Волынка / Барабаны<br>Яркость → насыщение → эхо + реверберация → уровень<br>↓<br>Общий компрессор → звук и чернила</p><p id="texture-routing">Трение винила — отдельный шумовой канал. Чернила добавляют непрерывный голос во второй синт. Локальная роботизированная речь → собственная ветвь общих заклинаний → общий выход и анализ.</p></details>
   <p class="shortcuts">Пробел — играть / пауза. Печать — строка. Минус / плюс — сжатие. Стрелки на теле — скретч. Enter и стрелки на чернилах — голос. Escape — общий вид. I — это окно. Вверх / вниз и Enter на теле — выбрать и открыть кольцо. После коллапса пробел начинает новый круг.</p>
 </dialog>

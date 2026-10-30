@@ -3,7 +3,7 @@
 // The A2/A3 drone (a continuous low tone at 110 and 220 Hz) lives in the
 // bagpipe ring. The bass takes the key degrees of the bagpipe phrases.
 import {BPM} from './folk-score.mjs?v=ritual-10';
-import {CELLS,PIPE,BASS,ROOTS,cellNotes,bassNotes} from './chain-model.mjs?v=chains-1';
+import {CELLS,PIPE,BASS,ROOTS,cellNotes,bassNotes} from './chain-model.mjs?v=chains-2';
 export const SEGMENT_BEATS=CELLS,MASTER_BEATS=16;
 export const beatSamples=sampleRate=>Math.round(60/BPM*sampleRate);
 const midi=n=>440*2**((n-69)/12),TAU=Math.PI*2;

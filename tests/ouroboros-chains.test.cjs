@@ -85,3 +85,14 @@ test('chains share the circle by weight and the skin shader never mirrors scales
   const led=chainCreatures(ring,snakes,2,skins);assert.equal(led[0].uid,'c');assert.equal(led[0].offset,0);
   const shader=fs.readFileSync(`${root}/engraving-renderer.mjs`,'utf8');assert.ok(!/abs\(fract/.test(shader),'no triangle-wave mirror');assert.ok(/textureGrad/.test(shader));
 });
+
+test('four more spells and a tunable voice of the abyss',async()=>{
+  const {SPELLS,findSpell}=await import(`${root}/spell-book.mjs`);const {SPELL_KEYS,silentSpells}=await import(`${root}/spell-rack.mjs`);
+  for(const word of ['Эхо','Туман','Лёд','Дрожь'])assert.ok(findSpell(word),word);
+  assert.ok(findSpell('лед'),'ё and е are the same letter in the line');
+  assert.equal(SPELLS.at(-1).word,'Снять');
+  for(const s of SPELLS.filter(s=>s.key!=='clear'))assert.ok(SPELL_KEYS.includes(s.key),s.key);
+  assert.deepEqual(Object.keys(silentSpells()).sort(),[...SPELL_KEYS].sort());
+  const {VOICE_RANGES,voiceDefaults}=await import(`${root}/ritual-voice.mjs`);const d=voiceDefaults();
+  for(const [key,[lo,hi]] of Object.entries(VOICE_RANGES))assert.ok(d[key]>=lo&&d[key]<=hi,key);
+});

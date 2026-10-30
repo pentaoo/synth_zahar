@@ -1,4 +1,4 @@
-import {renderRing} from './chain-score.mjs?v=chains-1';
+import {renderRing} from './chain-score.mjs?v=chains-2';
 self.onmessage=({data})=>{
   try{
     const ring=renderRing(data.sampleRate,data.channel,data.cells,{pipe:data.pipe,wave:data.wave});

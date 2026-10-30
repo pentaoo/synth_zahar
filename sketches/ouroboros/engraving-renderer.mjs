@@ -1,6 +1,6 @@
-import {TAU,RINGS,ringMetrics,collapsePresentation,project,unproject} from './body-geometry.mjs?v=chains-1';
-import {chainCreatures,chainShares,creaturePoint,sampleCreature,ritualPresentation,hitCreature,eyePoint} from './ritual-geometry.mjs?v=chains-1';
-import {SPECIES,CELLS,runeFor} from './chain-model.mjs?v=chains-1';
+import {TAU,RINGS,ringMetrics,collapsePresentation,project,unproject} from './body-geometry.mjs?v=chains-2';
+import {chainCreatures,chainShares,creaturePoint,sampleCreature,ritualPresentation,hitCreature,eyePoint} from './ritual-geometry.mjs?v=chains-2';
+import {SPECIES,CELLS,runeFor} from './chain-model.mjs?v=chains-2';
 import {angleDelta} from './score.mjs';
 const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
 const wrapAngle=a=>Math.atan2(Math.sin(a),Math.cos(a));
@@ -26,7 +26,7 @@ export class EngravingRenderer {
     this.orders=[[],[],[]];this.weights=new Map();this.summons=new Map();this.arrivals=new Map();this.departing=[];this.turns=[0,0,0];this.lastAngles=[null,null,null];this.runeHits=[];this.clock=0;
   }
   async initialize(){
-    const manifest=await (await fetch(new URL('./assets/ritual/skins.json?v=chains-1',import.meta.url))).json();
+    const manifest=await (await fetch(new URL('./assets/ritual/skins.json?v=chains-2',import.meta.url))).json();
     this.skins=manifest;this.assets={};
     const gl=this.gl;
     const shader=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s;};
@@ -97,7 +97,7 @@ export class EngravingRenderer {
       const rise=reduced?0:(local*w*(.16+.2*tooth)+tension*w*.045*tooth*neck);
       const lean=reduced?0:local*scratch.direction*w*.12;
       const press=ring.index===2&&bend===0?ink.pressureAt(angle)*w*.22*neck:0;
-      const taper=ring.fullLength-material<ring.baseWidth*2.7?Math.max(.10,(ring.fullLength-material)/(ring.baseWidth*2.7)):1;
+      const tail=ring.length-material,taper=tail<ring.baseWidth*2.7?Math.max(.10,tail/(ring.baseWidth*2.7)):1;
       for(let side=0;side<2;side++){
         const amount=(side===0?-1:1)*w*.5*taper-(side===0?rise:0)-press;
         const k=(j*2+side)*4;v[k]=p.x+p.ty*amount+(side===0?p.tx*lean:0);v[k+1]=p.y-p.tx*amount+(side===0?p.ty*lean:0);v[k+2]=material/ring.tileLength;v[k+3]=side;
@@ -181,6 +181,12 @@ export class EngravingRenderer {
     const shares=chainShares(this.orders[index],weights),entry=shares.find(e=>e.uid===clock.uids?.[segment]);
     return spec.angle+TAU*(entry?entry.start+entry.share*frac:clock.phase);
   }
+  // How far a flying chain has grown back to its full length (the pinch swallows material).
+  stretchFor(path,ring){
+    if(!path||typeof path!=='object')return 0;const H=ring.thickness*(ring.headUnits||1);
+    if(path.kind==='depart')return smooth(path.distance/(ring.fullLength*.5+H));
+    return path.distance<=0?1:1-smooth(path.distance/(TAU*ring.radius+H));
+  }
   summonView(ring,gate,t,overview){
     const {width,height}=this,Z0=Math.max(1.5,Math.min(16,height*.34/Math.max(1,ring.thickness))),k=smooth((t-.36)/.64),z=Math.exp(Math.log(Z0)*(1-k));
     const rotation=wrapAngle(-(gate+Math.PI/2))*(1-k),F={x:Math.cos(gate)*ring.radius,y:Math.sin(gate)*ring.radius},end=project(F,overview);
@@ -189,16 +195,25 @@ export class EngravingRenderer {
   }
   // The inscription sits still inside the ring's visible arc, read left to right,
   // while the snake keeps moving with the record. One rune per beat.
-  runes(c,view,{active=-1,audible=null,mini=false}={}){
+  runes(c,view,{active=-1,audible=null,mini=false,avoid=[]}={}){
     this.runeHits=[];if(mini||!c||c.thickness<.5||!c.cells)return;
     const x=this.ctx,size=Math.max(22,Math.min(32,c.thickness*view.scale*.36)),inner=c.radius-c.thickness*.5-size*1.25/view.scale;
     // Centre the inscription where the ring passes nearest a calm spot of the screen.
     const mobile=this.width<700,target=mobile?{x:this.width/2,y:this.height*.9}:{x:this.width*.62,y:this.height*.4};
     const spacing=Math.min(mobile?(this.width-48)/CELLS:64,Math.max(40,size*2.3))/view.scale/Math.max(1,inner);
     const local={x:(target.x-view.tx)/view.scale,y:(target.y-view.ty)/view.scale},turn=view.rotation,centre=Math.atan2(local.y*Math.cos(turn)-local.x*Math.sin(turn),local.x*Math.cos(turn)+local.y*Math.sin(turn));
+    // Slide the inscription along the arc until no rune lands on the line, the panels or the screen edge.
+    // Inside the arc first, then outside it; otherwise the place with the fewest collisions.
+    const outer=c.radius+c.thickness*.5+size*1.25/view.scale;
+    const place=(a,radius)=>[...Array(CELLS).keys()].map(k=>{const angle=a+(k-(CELLS-1)/2)*spacing*inner/radius;return project({x:Math.cos(angle)*radius,y:Math.sin(angle)*radius},view);});
+    const hits=points=>points.filter(q=>!(q.x>size&&q.x<this.width-size&&q.y>size&&q.y<this.height-size*1.6)||avoid.some(r=>q.x>r.x-size&&q.x<r.x+r.w+size&&q.y>r.y-size*1.7&&q.y<r.y+r.h+size)).length;
+    let points=place(centre,inner),best=hits(points);
+    search:for(const radius of [inner,outer])for(let step=0;step<=200&&best>0;step++)for(const sign of [1,-1]){
+      const candidate=place(centre+sign*step*.015,radius),n=hits(candidate);if(n<best){best=n;points=candidate;if(!n)break search;}
+    }
     x.save();x.fillStyle='#000';x.strokeStyle='#000';x.textAlign='center';x.textBaseline='middle';
     for(let k=0;k<CELLS;k++){
-      const angle=centre+(k-(CELLS-1)/2)*spacing,at=project({x:Math.cos(angle)*inner,y:Math.sin(angle)*inner},view);
+      const at=points[k];
       const cell=c.cells[k],pending=audible&&audible[k]!==cell;
       x.font=size+'px "Noto Sans Runic","Segoe UI Historic","Apple Symbols",Georgia,serif';
       if(k===active){x.beginPath();x.arc(at.x,at.y,size*.75,0,TAU);x.lineWidth=1.2;x.stroke();}
@@ -209,7 +224,7 @@ export class EngravingRenderer {
     x.restore();
   }
   hitRune(point){for(const h of this.runeHits)if(Math.hypot(point.x-h.x,point.y-h.y)<h.r)return h;return null;}
-  render({baseRadius,compression,chains=[[],[],[]],clocks=[],rates=[0,0,0],selectedUid='',audible=null,viewState,ink,scratch,life=[],finale=0,finalePose=null,reduced=false,dt=.016}){
+  render({avoid=[],baseRadius,compression,chains=[[],[],[]],clocks=[],rates=[0,0,0],selectedUid='',audible=null,viewState,ink,scratch,life=[],finale=0,finalePose=null,reduced=false,dt=.016}){
     if(!this.ready)return;this.life=life;this.clock+=dt;
     const gl=this.gl,{width,height}=this,p=viewState.progress,weights=this.layoutChains(chains,reduced?1e3:dt);
     const rings=RINGS.map((spec,i)=>{const natural=this.naturalAngle(i,clocks[i],weights),ring={...ringMetrics(i,baseRadius,compression,0,finale),baseRadius,ratio:spec.ratio};ring.headAngle=natural;
@@ -229,7 +244,8 @@ export class EngravingRenderer {
     }else selectedRing.headAngle=layout.angle;
     viewState.displayAngle=selectedRing.headAngle;
     const all=rings.flatMap(r=>chainCreatures(r,this.orders[r.index],r.index===sel?lead:0,this.skins,weights)),creatures=all.filter(c=>!c.ghost&&c.length>.5);
-    const chosen=creatures.filter(c=>c.channel===sel),focusOn=p>0;
+    const focusOn=p>0,stretch=focusOn&&bend?this.stretchFor(bend,selectedRing):0;
+    const chosen=stretch>0?chainCreatures(selectedRing,order,lead,this.skins,weights,stretch).filter(c=>!c.ghost&&c.length>.5):creatures.filter(c=>c.channel===sel);
     let others=creatures.filter(c=>!focusOn||c.channel!==sel);if(!focusOn)bend=0;
     if(bend&&chosen[0])bend={...bend,headLength:chosen[0].thickness*chosen[0].headUnits};
     // Summon flights: the camera starts close on the gate and ends on the overview.
@@ -242,7 +258,7 @@ export class EngravingRenderer {
       const {view:camera,clear}=this.summonView(ring,gate,t,focusOn?remaining:overview);
       const enter=1-(1-Math.min(1,t/.34))**3,coil=smooth((t-.34)/.5);
       const path=t<.84?{kind:'arrive',gate,headLength:H,distance:-clear+enter*clear+coil*(TAU*ring.radius+H)}:0;
-      flights.push({group,camera,path});others=others.filter(c=>c.channel!==channel);
+      flights.push({group:path?chainCreatures(ring,this.orders[channel],0,this.skins,weights,this.stretchFor(path,ring)).filter(c=>!c.ghost&&c.length>.5):group,camera,path});others=others.filter(c=>c.channel!==channel);
     }
     // A snake joining a ring that already sounds flies in head first and coils into the gap opening for it.
     const joining=[];
@@ -252,7 +268,8 @@ export class EngravingRenderer {
       const inFocus=focusOn&&c.channel===sel;if(inFocus&&!layout.visible)continue;
       const camera=inFocus?view:remaining,r=Math.max(1,c.radius),H=c.thickness*c.headUnits,own={...c,offset:0,headAngle:c.headAngle-c.offset/r};
       const landing=own.headAngle+(rates[c.channel]||0)*(1-t)*ARRIVE_SECONDS-c.length/r,clear=Math.hypot(width,height)/camera.scale+c.thickness*4;
-      joining.push({creature:own,camera,path:{kind:'arrive',gate:landing,headLength:H,distance:-clear+smooth(t)*(clear+c.length+H)}});
+      const distance=-clear+smooth(t)*(clear+c.length+H),grow=distance<=0?1:1-smooth(distance/(c.length+H));own.length=c.length+Math.max(0,c.fullLength-c.length)*grow;
+      joining.push({creature:own,camera,path:{kind:'arrive',gate:landing,headLength:H,distance}});
       others=others.filter(o=>o.uid!==uid);
     }
     const chosenDrawn=chosen.filter(c=>!joining.some(j=>j.creature.uid===c.uid));
@@ -263,7 +280,7 @@ export class EngravingRenderer {
     for(const f of flights)draw(f.group,f.camera,f.path);
     for(const j of joining)draw([j.creature],j.camera,j.path);
     this.departing=this.departing.filter(d=>{
-      const t=reduced?1:(this.clock-d.start)/DEPART_SECONDS;if(t>=1)return false;const c=d.creature,H=c.thickness*c.headUnits;
+      const t=reduced?1:(this.clock-d.start)/DEPART_SECONDS;if(t>=1)return false;const c={...d.creature},H=c.thickness*c.headUnits;c.length+=Math.max(0,c.fullLength-c.length)*smooth(t*2);
       draw([c],d.camera,{kind:'depart',gate:d.gate,headLength:H,distance:smooth(t)*(c.length+H+Math.hypot(width,height)/d.camera.scale+c.thickness*4)});return true;
     });
     const windowRadius=Math.max(0,rings[2].radius-rings[2].thickness*.65);this.ink(ink,remaining,windowRadius,1);
@@ -278,7 +295,7 @@ export class EngravingRenderer {
     if(p===1&&!finalePose&&marked){
       const c=marked,clock=clocks[sel];let active=-1;
       if(clock?.segments){const position=clock.phase*clock.segments,segment=Math.min(clock.segments-1,Math.floor(position));if(clock.uids?.[segment]===c.uid)active=Math.min(CELLS-1,Math.floor((position-segment)*CELLS));}
-      this.runes(c,view,{active,audible:audible?.[c.uid]||null});
+      this.runes(c,view,{active,audible:audible?.[c.uid]||null,avoid});
     }
     const eyes={};for(const c of creatures){const camera=focusOn&&c.channel===sel?view:remaining;eyes[c.uid]=project(eyePoint(c,focusOn&&c.channel===sel?bend:0),camera);}
     this.scene={rings,creatures,eyes,view,bend,focus:focusOn?sel:-1,overview,remaining,windowRadius,mini,miniActive:layout.miniActive,visible:layout.visible,stage:layout.stage,mobile:layout.mobile,lead,flying:flights.length>0||joining.length>0||this.departing.length>0};return this.scene;

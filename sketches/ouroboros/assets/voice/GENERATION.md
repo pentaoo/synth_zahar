@@ -12,6 +12,10 @@
 /usr/bin/say -v Milena -r 115 -o /private/tmp/ouroboros-clear.aiff 'Снять'
 /usr/bin/say -v Milena -r 105 -o /private/tmp/ouroboros-recitative-a.aiff 'Круг держит память. Камень слышит имя.'
 /usr/bin/say -v Milena -r 105 -o /private/tmp/ouroboros-recitative-b.aiff 'Ветер возвращает голос. Имя входит в круг.'
+/usr/bin/say -v Milena -r 115 -o /private/tmp/ouroboros-echo.aiff 'Эхо'
+/usr/bin/say -v Milena -r 115 -o /private/tmp/ouroboros-fog.aiff 'Туман'
+/usr/bin/say -v Milena -r 115 -o /private/tmp/ouroboros-ice.aiff 'Лёд'
+/usr/bin/say -v Milena -r 115 -o /private/tmp/ouroboros-tremble.aiff 'Дрожь'
 ```
 
 AIFF преобразованы штатным `afconvert … -f WAVE -d LEI16@22050` в одноимённые WAV этой папки. `ouroboros-voice-test.aiff` → `vault.wav`.

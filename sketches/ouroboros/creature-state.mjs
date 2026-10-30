@@ -18,7 +18,7 @@ export class CreatureLife {
       const age=time-s.blinkAt;s.blink=reduced?0:age<0?0:age<.07?Math.sin(age/.07*Math.PI/2)**2:age<.13?1:age<.24?Math.cos((age-.13)/.11*Math.PI/2)**2:0;
       const eye=eyes[s.id]||pointer,dx=pointer.x-eye.x,dy=pointer.y-eye.y,d=Math.max(90,Math.hypot(dx,dy));
       const inertia=1-Math.exp(-dt/.15);s.gazeX+=(clamp(dx/d,-1,1)-s.gazeX)*inertia;s.gazeY+=(clamp(dy/d,-1,1)-s.gazeY)*inertia;
-      const fx=spells?.values(s.id)||{vault:0,rage:0,split:0};s.effects=fx;
+      const fx=spells?.values(s.id)||{};s.effects=fx;
       const tension=(contact===s.id?.7:0)+(s.active?.12:0)+fx.rage*.5;
       s.tension+=(tension-s.tension)*(1-Math.exp(-dt/.09));if(reduced)s.tension=0;
     }return this.states;
