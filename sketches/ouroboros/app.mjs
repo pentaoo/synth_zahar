@@ -196,7 +196,10 @@ stage.addEventListener('wheel',event=>{
 stage.addEventListener('gesturestart',e=>{if(finale.state==='ready'){e.preventDefault();pinch.safariStart();}},{passive:false});
 stage.addEventListener('gesturechange',e=>{e.preventDefault();if(finale.state==='ready')pinch.safariChange(e.scale);},{passive:false});
 stage.addEventListener('gestureend',e=>{e.preventDefault();if(pinch.source!=='safari')return;if(finale.state==='ready')pinch.safariChange(e.scale);endPinch();},{passive:false});
-window.addEventListener('blur',pause);document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
+// Leaving the window (another tab, a second screen) keeps the music playing;
+// only a hand that was on the snakes lets go, so nothing stays stuck.
+function letGo(){touchPinch.clear();endPinch();wheel.reset();endGesture();scratchVisual.clear();}
+window.addEventListener('blur',letGo);document.addEventListener('visibilitychange',()=>{if(document.hidden)letGo();});
 window.addEventListener('keydown',event=>{
   const inLine=event.target===spellInput,nativeText=event.target.matches('input:not([type=range]),textarea,select,[contenteditable=true]');
   if(inLine){
