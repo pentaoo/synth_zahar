@@ -12,7 +12,7 @@ import {RINGS,TAU,ringMetrics,bodyPoint,project,unproject,BodyIntent,controlRect
 import {shortcut} from './input-shortcuts.mjs?v=chains-2';
 import {ViewState,Finale} from './view-state.mjs?v=chains-2';
 import {InkMass} from './ink-physics.mjs?v=chains-2';
-import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-7';
+import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-8';
 
 const $=id=>document.getElementById(id),root=$('ouroboros'),stage=$('stage'),canvas=$('canvas'),inkButton=$('ink'),probe=$('audio-state'),panel=$('channel-panel'),minimap=$('minimap'),dialog=$('sound-dialog');
 const voicePanel=$('voice-panel'),spellLine=$('spell-line'),spellInput=$('spell-input'),feedback=$('spell-feedback'),life=new CreatureLife(),touchPinch=new TouchPinch();
@@ -100,7 +100,7 @@ function beginFinale(){
 async function restart(){
   if(restarting)return;restarting=true;
   finale.reset();lastIncantation=null;feedback.textContent='';view.close(true);ink.reset();compressionPressure=0;pinch.set(1);root.dataset.finale='ready';pendingWrites.length=0;
-  try{await audio.restart();for(const s of chains.all)audible[s.uid]=[...s.cells];selectedUid=chains.all[0]?.uid||'';populateControls();}catch(e){message(e.message,true);}finally{restarting=false;sync();}
+  renderer?.awaitSummons();try{await audio.restart();for(const s of chains.all){audible[s.uid]=[...s.cells];renderer?.summon(s.channel,s.uid,true);}selectedUid=chains.all[0]?.uid||'';populateControls();}catch(e){if(renderer)renderer.awaiting=false;message(e.message,true);}finally{restarting=false;sync();}
 }
 const snakeOf=uid=>chains.find(uid);
 function openChannel(index,angle=0,uid=''){

@@ -156,6 +156,7 @@ export class EngravingRenderer {
   }
   // A summoned snake flies straight in along the tangent, head first, and coils into its ring.
   summon(channel,uid,created){
+    this.awaiting=false;
     this.weights.set(uid,{w:created?1:0,target:1});
     if(created)this.summons.set(channel,{start:this.clock,uid});else this.arrivals.set(uid,{start:this.clock,channel});
   }
@@ -171,6 +172,8 @@ export class EngravingRenderer {
     const head=t<.42?start+(stop-start)*(1-(1-t/.42)**3):stop+(end-stop)*((t-.42)/.58)**2.2;
     return {camera,path:{kind:'arrive',gate,headLength:H,distance:H-head}};
   }
+  // A new round: its first snakes stay hidden until they are summoned in.
+  awaitSummons(){this.awaiting=true;this.weights.clear();this.orders=[[],[],[]];this.summons.clear();this.arrivals.clear();this.departing=[];}
   // A removed snake leaves forward along the tangent at its own head.
   release(uid){
     const c=this.scene?.creatures.find(c=>c.uid===uid);const w=this.weights.get(uid);if(w)w.target=0;
@@ -185,7 +188,7 @@ export class EngravingRenderer {
         const now=live.find(s=>s.uid===e.uid);
         if(now)next.push(now);else{const w=this.weights.get(e.uid);if(w&&w.w>.002){w.target=0;next.push({...e,ghost:true});}}
       }
-      for(const s of live)if(!next.some(e=>e.uid===s.uid)){next.push(s);if(!this.weights.has(s.uid))this.weights.set(s.uid,{w:had?0:1,target:1});}
+      for(const s of live)if(!next.some(e=>e.uid===s.uid)){next.push(s);if(!this.weights.has(s.uid))this.weights.set(s.uid,this.awaiting?{w:0,target:0}:{w:had?0:1,target:1});}
       this.orders[i]=next.filter(e=>!e.ghost||ids.has(e.uid)||(this.weights.get(e.uid)?.w||0)>.002);
     }
     const k=1-Math.exp(-dt/.35),known=new Set(this.orders.flat().map(e=>e.uid)),weights={};
