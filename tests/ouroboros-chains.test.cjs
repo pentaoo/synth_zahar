@@ -121,3 +121,23 @@ test('desktop grid: seven columns, rings in the middle three, settings in the fi
     assert.ok(mini.x>=g.x(5)-1e-6&&mini.x+mini.size<=g.x(6)+g.col+1e-6,'minimap in the last two columns');
   }
 });
+
+test('«Чешуя»: rubbing ducks the record, clicks the scales and bows the ring note',()=>{
+  let P;vm.runInNewContext(fs.readFileSync(`${root}/transport-vinyl-worklet.js`,'utf8'),{sampleRate:8000,Float32Array,AudioWorkletProcessor:class{constructor(){this.port={postMessage:()=>{}};}},registerProcessor(_,p){P=p;}});
+  const stems=[0,1,2].map(()=>Float32Array.from({length:16000},(_,i)=>Math.sin(i*.07)*.2));
+  const make=mode=>{const p=new P(),send=data=>p.port.onmessage({data});send({type:'load',stems});send({type:'mode',value:mode});send({type:'friction',frequency:220});send({type:'play',value:true});return {p,send};};
+  const render=(p,frames)=>{const outputs=Array.from({length:10},()=>[new Float32Array(frames)]);p.process([],outputs);return outputs.map(o=>o[0]);};
+  const rms=a=>Math.sqrt(a.reduce((s,v)=>s+v*v,0)/a.length);
+  const scales=make('scales'),vinyl=make('vinyl');
+  for(const t of [scales,vinyl]){render(t.p,512);t.send({type:'grab'});}
+  let musicS=0,musicV=0,surface=[];
+  for(let k=0;k<20;k++){for(const t of [scales,vinyl])t.send({type:'motion',velocity:4});const a=render(scales.p,128),b=render(vinyl.p,128);if(k>4){musicS+=rms(a[0]);musicV+=rms(b[0]);surface.push(...a[3]);}}
+  assert.equal(scales.p.position,vinyl.p.position,'the hand still scrolls the same position');
+  assert.ok(musicS<musicV*.4,'the record is ducked under the scales');
+  assert.ok(rms(surface)>.01&&surface.every(Number.isFinite),'the scales and the bowed note sound');
+  assert.ok(scales.p.lastScale>3,'several scales clicked');
+  for(const t of [scales,vinyl])t.send({type:'release'});render(scales.p,16000);render(vinyl.p,16000);
+  const after=render(scales.p,512),plain=render(vinyl.p,512);
+  assert.ok(rms(after[3])<1e-3,'quiet after the hand leaves');
+  assert.ok(Math.abs(rms(after[0])-rms(plain[0]))<1e-3,'music back at full level');
+});

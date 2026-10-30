@@ -1,4 +1,4 @@
-import {OuroborosAudio} from './engine.mjs?v=chains-4';
+import {OuroborosAudio} from './engine.mjs?v=chains-5';
 import {clamp,wrap} from './folk-score.mjs?v=ritual-10';
 import {CreatureLife} from './creature-state.mjs?v=chains-2';
 import {SPELLS,SPELL_WORDS} from './spell-book.mjs?v=chains-2';
@@ -47,7 +47,7 @@ window.addEventListener('pointerdown',()=>{root.dataset.modality='pointer';},tru
 window.addEventListener('keydown',event=>{root.dataset.modality=event.key==='Tab'?'keyboard':root.dataset.modality==='keyboard'&&/^(Shift|Enter| |Escape|Arrow)/.test(event.key)?'keyboard':'pointer';},true);
 if(transportKind==='slip'){$('transport-description').textContent='Сохранённый Slip: после штриха музыка возвращается в текущее фоновое время. Цепочки змей в этом режиме не звучат.';$('texture-routing').hidden=true;}
 const wheel=new WheelScratch({
-  grab:()=>audio.grab(),motion:(v,a)=>applyScratch(v,a),release:options=>audio.release(options),
+  grab:()=>audio.grab(view.progress>0?view.selected:1),motion:(v,a)=>applyScratch(v,a),release:options=>audio.release(options),
   changed:state=>{root.dataset.wheelScratching=String(state.active);if(!gesture)stage.dataset.gesture=state.active?'scratch':'';}
 });
 const pinch=new PinchScale({
@@ -157,7 +157,7 @@ stage.addEventListener('pointerdown',async event=>{
 });
 async function beginScratch(current){
   if(current.started)return;current.started=true;current.type='scratch';wheel.cancel();audio.cancelScratch();stage.dataset.gesture='scratch';
-  if(await start()&&gesture===current){current.ready=true;audio.grab();if(current.velocity)applyScratch(current.velocity,current.hit.angle);}
+  if(await start()&&gesture===current){current.ready=true;audio.grab(current.hit.channel);if(current.velocity)applyScratch(current.velocity,current.hit.angle);}
 }
 stage.addEventListener('pointermove',event=>{
   if(!renderer?.scene)return;const p=coordinates(event);pointer=p;
@@ -227,7 +227,7 @@ canvas.addEventListener('keydown',e=>{
 });
 canvas.addEventListener('keydown',async e=>{
   if(!['ArrowLeft','ArrowRight'].includes(e.key)||finale.state!=='ready')return;e.preventDefault();
-  if(!keyboard){wheel.cancel();keyboard='scratch';if(!await start()||keyboard!=='scratch')return;audio.grab();}
+  if(!keyboard){wheel.cancel();keyboard='scratch';if(!await start()||keyboard!=='scratch')return;audio.grab(view.selected);}
   applyScratch(e.key==='ArrowRight'?3.5:-3.5,-Math.PI/2);
 });
 canvas.addEventListener('keyup',e=>{if(['ArrowLeft','ArrowRight'].includes(e.key))endGesture();});

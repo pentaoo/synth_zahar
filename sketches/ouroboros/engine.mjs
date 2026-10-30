@@ -37,8 +37,9 @@ const driveCurve=amount=>{
   for(let i=0;i<curve.length;i++) {const x=i*2/(curve.length-1)-1;curve[i]=Math.tanh(x*strength)/Math.tanh(strength);}
   return curve;
 };
+const FRICTION=[110,220,82.41];
 const TRANSPORTS={
-  vinyl:{module:'./transport-vinyl-worklet.js',processor:'ouroboros-vinyl-transport'},
+  vinyl:{module:'./transport-vinyl-worklet.js?v=scales-1',processor:'ouroboros-vinyl-transport'},
   slip:{module:'./transport-worklet.js',processor:'ouroboros-transport'}
 };
 
@@ -48,7 +49,7 @@ export class OuroborosAudio {
     this.channelSettings=channelDefaults();this.inkMacro=null;this.spells=new SpellBook();this.phraseAudio=true;this.voiceError='';
     this.voiceSettings=voiceDefaults();this.chains=new Chains();this.ringKeys=['','',''];this.ringOrder=[new Map(),new Map(),new Map()];this.ringRenderer=new RingRenderer();this.chainMode=this.transportKind==='vinyl';
     this.channelSettings[0].wave=DEFAULT_WAVES[0];this.channelSettings[1].wave=DEFAULT_WAVES[1];
-    this.onstate=onstate;this.waves=[...DEFAULT_WAVES];this.playing=false;this.ready=null;this.rate=1;this.scratchMode='vinyl';this.playIntent=0;
+    this.onstate=onstate;this.waves=[...DEFAULT_WAVES];this.playing=false;this.ready=null;this.rate=1;this.scratchMode='scales';this.playIntent=0;
     this.state={phase:0,backgroundPhase:0,speed:0,rate:1,peak:0,motion:0,power:0,slipMix:0,modeMix:0,playing:false,scratching:false,queued:-1};this.ink=null;
   }
   async initialize() {
@@ -177,7 +178,8 @@ export class OuroborosAudio {
     this.setScratchSend(1);
     this.master.gain.setTargetAtTime(0,this.context.currentTime,.025);this.state={...this.state,playing:false,scratching:false,motion:0,power:0,slipMix:0,coasting:false,coastVelocity:0,texturePeak:0};this.onstate(this.state);
   }
-  grab() {if(this.playing){this.transport.port.postMessage({type:'grab'});this.setScratchSend(.22);}}
+  // The rubbed ring hums its own note: bass A2, bagpipe A3, drums E2.
+  grab(channel) {if(this.playing){if(FRICTION[channel])this.transport.port.postMessage({type:'friction',frequency:FRICTION[channel]});this.transport.port.postMessage({type:'grab'});this.setScratchSend(.22);}}
   motion(velocity) {if(this.playing&&Number.isFinite(velocity))this.transport.port.postMessage({type:'motion',velocity});}
   release({coastVelocity=0}={}) {this.transport?.port.postMessage({type:'release',coastVelocity});this.setScratchSend(1);}
   cancelScratch(){this.transport?.port.postMessage({type:this.transportKind==='vinyl'?'cancel':'release'});this.setScratchSend(1);}
@@ -231,7 +233,7 @@ export class OuroborosAudio {
     for(const channel of this.channels)channel.send.gain.setTargetAtTime(value,this.context.currentTime,value<1?.008:.025);
   }
   setScratchMode(value){
-    if(!['vinyl','synth'].includes(value))return;
+    if(!['scales','vinyl','synth'].includes(value))return;
     this.scratchMode=value;this.transport?.port.postMessage({type:'mode',value});
   }
   cue(section) {this.transport?.port.postMessage({type:'cue',section});}

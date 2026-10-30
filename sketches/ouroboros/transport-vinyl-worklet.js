@@ -14,6 +14,11 @@ class OuroborosVinylTransport extends AudioWorkletProcessor {
     // A second reader exists only for an explicitly requested I–IV jump.
     this.cuePosition=0;this.cueMix=0;this.queued=-1;
     this.mode=0;this.modeTarget=0;this.carrier=0;this.seed=9173;
+    // «Чешуя»: the hand rustles the scales and the rubbed ring hums its note
+    // like a hurdy-gurdy, while the record itself is ducked under them.
+    this.scales=0;this.scalesTarget=0;this.duck=0;this.friction=220;this.travel=0;this.lastScale=0;
+    this.click=0;this.clickLow=0;this.clickHigh=0;this.clickDull=0;this.rub=0;
+    this.lyre=0;this.lyrePhase=[0,0,0];this.lyreLow=0;this.lyreLow2=0;this.bow=0;
     this.envelope=0;this.peak=0;this.report=0;this.dirty=true;
     this.previousInput=new Float64Array(12);this.previousOutput=new Float64Array(12);this.travelBeats=0;
     // Snake chains: each ring loops its own buffer of N 8-beat phrases.
@@ -63,7 +68,8 @@ class OuroborosVinylTransport extends AudioWorkletProcessor {
       if(this.scratching)this.release();
       this.stopCoast();this.motion=0;this.motionTarget=0;this.hold=0;this.pendingRelease=0;this.pendingCoastVelocity=0;
     }else if(data.type==='rate'&&Number.isFinite(data.value)&&data.value>0)this.rateTarget=Math.max(.25,Math.min(4,data.value));
-    else if(data.type==='mode')this.modeTarget=data.value==='synth'?1:0;
+    else if(data.type==='mode'){this.modeTarget=data.value==='synth'?1:0;this.scalesTarget=data.value==='scales'?1:0;}
+    else if(data.type==='friction'&&Number.isFinite(data.frequency)&&data.frequency>20&&data.frequency<2000)this.friction=data.frequency;
     else if(data.type==='ring')this.ring(data);
     else if(data.type==='cue'&&Number.isInteger(data.section)&&data.section>=0&&data.section<4)this.queued=data.section;
     this.dirty=true;
@@ -105,6 +111,31 @@ class OuroborosVinylTransport extends AudioWorkletProcessor {
     // Keep the reader and filter history: changing speed here never seeks or
     // crossfades to an unrelated point. The optional throw advances this reader.
   }
+  // One dry click per scale passing under the hand: denser and brighter when
+  // fast, duller against the grain. Under them the ring is bowed: its note,
+  // fifth and octave, with the bow pressure wavering.
+  scaleVoice(magnitude,noise){
+    const hand=this.motion+this.coastVelocity,backwards=hand<0;
+    this.travel+=Math.abs(hand);
+    const spacing=(this.beat||sampleRate*.77)/6,scale=Math.floor(this.travel/spacing);
+    if(scale!==this.lastScale){this.lastScale=scale;this.click=.45+.55*Math.abs(this.grooveHash(scale,811));this.clickDull=backwards?1:0;}
+    this.click*=Math.exp(-1/(sampleRate*(this.clickDull?.0035:.0018)));
+    const bright=Math.min(.9,2*Math.PI*((this.clickDull?1300:2600)+2600*this.power)/sampleRate);
+    this.clickLow+=(noise*this.click-this.clickLow)*bright;
+    this.clickHigh+=(this.clickLow-this.clickHigh)*bright*.35;
+    this.rub+=(noise-this.rub)*.08;
+    const rustle=(this.clickLow-this.clickHigh)*.9+this.rub*this.power*.05;
+    const target=this.scratching||this.coastRemaining>0?magnitude/(magnitude+1):0;
+    this.lyre+=(target-this.lyre)*(target>this.lyre?1-Math.exp(-1/(sampleRate*.04)):1-Math.exp(-1/(sampleRate*.3)));
+    if(this.lyre<1e-5)return rustle;
+    this.bow+=(noise-this.bow)*.002;
+    const f=this.friction*(1+.006*Math.tanh(hand/6)),ratios=[1,1.5,2],weights=[.5,.28,.2];let string=0;
+    for(let k=0;k<3;k++){this.lyrePhase[k]=(this.lyrePhase[k]+f*ratios[k]/sampleRate)%1;string+=(this.lyrePhase[k]*2-1)*weights[k];}
+    const cut=1-Math.exp(-2*Math.PI*(450+2600*this.power)/sampleRate);
+    this.lyreLow+=(string-this.lyreLow)*cut;this.lyreLow2+=(this.lyreLow-this.lyreLow2)*cut;
+    const lyre=Math.tanh(this.lyreLow2*(1.4+this.power*1.6))*.2*this.lyre*(1+this.bow*3);
+    return rustle+lyre;
+  }
   grooveHash(index,salt){
     let value=(index|0)^salt;value=Math.imul(value^(value>>>16),0x45d9f3b);
     value=Math.imul(value^(value>>>16),0x45d9f3b);return ((value^(value>>>16))>>>0)/2147483648-1;
@@ -123,6 +154,10 @@ class OuroborosVinylTransport extends AudioWorkletProcessor {
       this.mode+=(this.modeTarget-this.mode)*this.modeSmooth;
       const magnitude=Math.abs(this.motion)+Math.abs(this.coastVelocity),powerTarget=this.scratching||this.coastRemaining>0?magnitude/(magnitude+1.5):0;
       this.power+=(powerTarget-this.power)*this.powerSmooth;
+      this.scales+=(this.scalesTarget-this.scales)*this.modeSmooth;
+      const duckTarget=this.scales*(this.scratching||this.coastRemaining>0?magnitude/(magnitude+.4):0);
+      this.duck+=(duckTarget-this.duck)*(duckTarget>this.duck?this.powerSmooth:this.textureRelease);
+      const audible=1-.88*this.duck;
       const ai=Math.floor(this.position),an=(ai+1)%this.length,af=this.position-ai;
       const bi=Math.floor(this.cuePosition),bn=(bi+1)%this.length,bf=this.cuePosition-bi;
       const effect=this.mode*this.power,depth=effect*.62;
@@ -142,7 +177,7 @@ class OuroborosVinylTransport extends AudioWorkletProcessor {
         }
         const filtered=value-this.previousInput[channel]+this.dc*this.previousOutput[channel];
         this.previousInput[channel]=value;this.previousOutput[channel]=filtered;
-        const output=filtered*this.envelope;
+        const output=filtered*this.envelope*audible;
         const outputIndex=channel<3?channel:channel+1;
         if(outputs[outputIndex]?.[0])outputs[outputIndex][0][n]=output;
         peak=Math.max(peak,Math.abs(output));
@@ -159,7 +194,7 @@ class OuroborosVinylTransport extends AudioWorkletProcessor {
         }
         const k=9+i,filtered=value-this.previousInput[k]+this.dc*this.previousOutput[k];
         this.previousInput[k]=value;this.previousOutput[k]=filtered;
-        const output=filtered*this.envelope*r.gain;
+        const output=filtered*this.envelope*r.gain*audible;
         if(outputs[4+i]?.[0])outputs[4+i][0][n]=output;
         peak=Math.max(peak,Math.abs(output));
         if(r.target===0&&r.gain<1e-4){r.pcm=null;r.old=null;r.gain=0;r.segments=0;this.dirty=true;}
@@ -179,6 +214,7 @@ class OuroborosVinylTransport extends AudioWorkletProcessor {
         this.textureInput=surface;this.textureOutput=filtered;
         texture=filtered*this.textureLevel*this.envelope;
       }else{this.textureLevel=0;this.textureLow=0;this.textureInput=0;this.textureOutput=0;}
+      if(this.scales>1e-4)texture=texture*(1-this.scales)+this.scaleVoice(magnitude,noise)*this.scales*this.envelope;
       if(outputs[3]?.[0])outputs[3][0][n]=texture;
       texturePeak=Math.max(texturePeak,Math.abs(texture));peak=Math.max(peak,Math.abs(texture));
       if(this.playing){
