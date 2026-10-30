@@ -12,7 +12,7 @@ import {RINGS,TAU,ringMetrics,bodyPoint,project,unproject,BodyIntent,controlRect
 import {shortcut} from './input-shortcuts.mjs?v=chains-2';
 import {ViewState,Finale} from './view-state.mjs?v=chains-2';
 import {InkMass} from './ink-physics.mjs?v=chains-2';
-import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-4';
+import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-5';
 
 const $=id=>document.getElementById(id),root=$('ouroboros'),stage=$('stage'),canvas=$('canvas'),inkButton=$('ink'),probe=$('audio-state'),panel=$('channel-panel'),minimap=$('minimap'),dialog=$('sound-dialog');
 const voicePanel=$('voice-panel'),spellLine=$('spell-line'),spellInput=$('spell-input'),feedback=$('spell-feedback'),life=new CreatureLife(),touchPinch=new TouchPinch();
@@ -312,7 +312,7 @@ function frame(now){
   const ringClocks=clocks(now),rates=ringClocks.map(c=>c?TAU*model.speed/c.seconds:0),sounding=soundingUids(ringClocks);
   const uids=chains.all.map(s=>s.uid);
   const creatureStates=life.update(now/1000,dt,{snakes:uids,active:sounding,playing:audio.playing,pointer:document.activeElement===spellInput?{x:width*.5,y:height*.85}:pointer,eyes:renderer?.scene?.eyes,selected:selectedUid,contact:gesture?.hit?.uid||'',spells:audio.spells,reduced:reduced.matches});
-  const stageBox=stage.getBoundingClientRect(),avoid=[spellLine,panel,voicePanel,minimap,spellLogList].filter(e=>!e.hidden).map(e=>{const r=e.getBoundingClientRect();return {x:r.left-stageBox.left-8,y:r.top-stageBox.top-8,w:r.width+16,h:r.height+16};});
+  const stageBox=stage.getBoundingClientRect(),avoid=[spellLine,panel,voicePanel,minimap,scrollText].filter(e=>!e.hidden).map(e=>{const r=e.getBoundingClientRect();return {x:r.left-stageBox.left-8,y:r.top-stageBox.top-8,w:r.width+16,h:r.height+16};});
   const scene=renderer?.render({dt,avoid,life:creatureStates,baseRadius,compression:pinch.scale,chains:chains.rings,clocks:reduced.matches?[]:ringClocks,rates,selectedUid,audible,viewState:view,ink,scratch:{angle:scratchVisual.angle,strength:scratchVisual.strengthAt(now),direction:scratchVisual.direction},finale:finale.progress,finalePose:finale.pose,reduced:reduced.matches});
   if(scene){
     updateViewUi(scene);
@@ -368,21 +368,13 @@ function turnRune(hit,step){
   if(hit.index===0&&cells[0]==='-')cells[0]=nextCell(snake.channel,'-',step);
   selectedUid=snake.uid;if(write(snake.uid,cells))message(snake.name+' · '+(hit.index+1)+' доля: '+cellLabel(snake.channel,cells[hit.index])+' · со следующего прохода');
 }
-// The log of this game: everything entered in the line, as one running text
-// set like an old scroll: small, centred, its column gently swaying.
-const spellLog=$('spell-log'),spellLogList=$('spell-log-list'),scrollText=$('spell-log-text'),bends=[...spellLogList.querySelectorAll('.bend')];
-const swayShape=(height,side)=>{const points=[];for(let k=0;k<=24;k++){const y=k/24,b=Math.sin(Math.PI*1.5*y-Math.PI*.25),x=50+(side==='left'?44:-44)*b;points.push(`${(side==='left'?x:100-x).toFixed(1)}% ${(y*100).toFixed(1)}%`);}
-  return side==='left'?`polygon(0 0,${points.join(',')},0 100%)`:`polygon(100% 0,${points.join(',')},100% 100%)`;};
-function layoutScroll(){
-  if(spellLog.hidden)return;const room=spellLog.clientHeight;
-  for(const b of bends){b.style.height=room+'px';b.style.shapeOutside=swayShape(room,b.dataset.side);}
-  // Fit the bends to the text, twice, since they change how it wraps.
-  for(let k=0;k<2;k++){const h=Math.min(room,Math.max(1,scrollText.offsetHeight));for(const b of bends)b.style.height=h+'px';}
-  spellLog.classList.toggle('overflowing',scrollText.offsetHeight>room);
-}
+// The log of this game: everything entered in the line, small and centred,
+// each entry on its own line, the newest at the bottom.
+const spellLog=$('spell-log'),scrollText=$('spell-log-text');
+function layoutScroll(){if(!spellLog.hidden)spellLog.classList.toggle('overflowing',scrollText.offsetHeight>spellLog.clientHeight);}
 function logLine(text){
-  scrollText.textContent=(scrollText.textContent?scrollText.textContent+' ':'')+text;
-  if(scrollText.textContent.length>6000)scrollText.textContent=scrollText.textContent.slice(-6000).replace(/^\S*\s/,'');
+  const line=document.createElement('span');line.textContent=text;scrollText.append(line);
+  while(scrollText.childElementCount>200)scrollText.firstElementChild.remove();
   layoutScroll();
 }
 $('spell-form').addEventListener('submit',async e=>{

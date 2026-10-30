@@ -85,15 +85,13 @@ dialog .shortcuts{font-size:12px}
 [data-mobile="true"] .spell-lexicon button{flex:none;font-size:14px}
 [data-mobile="true"] .spell-lexicon .lexicon-gap{width:10px;flex:none}
 [data-mobile="true"] #spell-feedback{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
-/* The log: everything entered in the line, as one running text set like an old scroll,
-   small and centred in the last two grid columns, its column gently swaying. */
+/* The log: everything entered in the line, small and centred in the last two
+   grid columns, one entry per line, ragged on both sides. */
 .spell-log{position:absolute;z-index:4;display:flex;flex-direction:column;justify-content:center;overflow:hidden;pointer-events:none;-webkit-mask-image:linear-gradient(transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(transparent,#000 12%,#000 88%,transparent)}
 .spell-log.overflowing{justify-content:flex-end}
 .spell-log[hidden]{display:none}
 .spell-log .scroll{flex:none;background:#fff}
-.spell-log .bend{display:block;width:16%}
-.spell-log .bend[data-side="left"]{float:left}
-.spell-log .bend[data-side="right"]{float:right}
-.spell-log p{margin:0;font-size:8pt;line-height:1.5;text-align:center;hyphens:auto;overflow-wrap:anywhere}
+.spell-log p{margin:0;font-size:8pt;line-height:1.5;text-align:center;overflow-wrap:anywhere}
+.spell-log p span{display:block}
 /* Desktop: nothing is written on the left; what was said goes to the log. */
 [data-mobile="false"] #spell-feedback{display:none}

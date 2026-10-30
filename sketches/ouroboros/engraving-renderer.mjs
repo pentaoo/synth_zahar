@@ -4,7 +4,7 @@ import {SPECIES,CELLS,runeFor} from './chain-model.mjs?v=chains-2';
 import {angleDelta} from './score.mjs';
 const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
 const wrapAngle=a=>Math.atan2(Math.sin(a),Math.cos(a));
-export const SUMMON_SECONDS=3.4,DEPART_SECONDS=1.8,ARRIVE_SECONDS=2.6;
+export const SUMMON_SECONDS=3.4,DEPART_SECONDS=1.8,ARRIVE_SECONDS=2.6,PASS_SECONDS=2.8;
 const loadImage=async src=>{
   for(let attempt=0;attempt<3;attempt++){
     const im=new Image(),url=new URL(src);if(attempt)url.searchParams.set('retry',String(attempt));
@@ -153,6 +153,18 @@ export class EngravingRenderer {
     this.weights.set(uid,{w:created?1:0,target:1});
     if(created)this.summons.set(channel,{start:this.clock,uid});else this.arrivals.set(uid,{start:this.clock,channel});
   }
+  // Before it coils in, a called snake passes close by on the left: the huge head
+  // rises from the bottom edge, stops for a breath, flies up and pulls its body
+  // and tail after it. A camera on the straight line, turned so the line is vertical.
+  pass(ring,gate,H,length,t){
+    const {width,height}=this,scale=Math.min(width*(width<700?.42:.24),height*.34)/Math.max(1,ring.thickness),half=height/2/scale;
+    const sin=Math.sin(gate),cos=Math.cos(gate),q0=length+2*half+4*H,F={x:ring.radius*cos+q0*sin,y:ring.radius*sin-q0*cos};
+    const rotation=-Math.PI-gate,rc=Math.cos(rotation),rs=Math.sin(rotation),x=width*(width<700?.3:.2);
+    const camera={scale,rotation,tx:x-scale*(F.x*rc-F.y*rs),ty:height/2-scale*(F.x*rs+F.y*rc)};
+    const start=q0+half+1.5*H,stop=q0+half*.8,end=q0-half-length-1.5*H;
+    const head=t<.42?start+(stop-start)*(1-(1-t/.42)**3):stop+(end-stop)*((t-.42)/.58)**2.2;
+    return {camera,path:{kind:'arrive',gate,headLength:H,distance:H-head}};
+  }
   // A removed snake leaves forward along the tangent at its own head.
   release(uid){
     const c=this.scene?.creatures.find(c=>c.uid===uid);const w=this.weights.get(uid);if(w)w.target=0;
@@ -245,10 +257,15 @@ export class EngravingRenderer {
     // Summon flights: on the overview camera, like the return from the large view.
     const flights=[];
     for(const [channel,summon] of this.summons){
-      const t=reduced?1:(this.clock-summon.start)/SUMMON_SECONDS;
+      const age=this.clock-summon.start,t=reduced?1:(age-PASS_SECONDS)/SUMMON_SECONDS;
       if(t>=1||!rings[channel].thickness||(focusOn&&channel===sel)||finalePose){this.summons.delete(channel);continue;}
       const ring=rings[channel],group=others.filter(c=>c.channel===channel);if(!group.length)continue;
-      const H=group[0].thickness*group[0].headUnits,gate=ring.headAngle+(rates[channel]||0)*Math.max(0,.84-t)*SUMMON_SECONDS;
+      const H=group[0].thickness*group[0].headUnits;
+      if(t<0){
+        const pass=this.pass(ring,ring.headAngle,H,Math.max(ring.length,ring.fullLength||0),age/PASS_SECONDS);
+        flights.push({group:chainCreatures(ring,this.orders[channel],0,this.skins,weights,1).filter(c=>!c.ghost&&c.length>.5),...pass});others=others.filter(c=>c.channel!==channel);continue;
+      }
+      const gate=ring.headAngle+(rates[channel]||0)*Math.max(0,.84-t)*SUMMON_SECONDS;
       const camera=focusOn?remaining:overview,clear=Math.hypot(width,height)/camera.scale+ring.thickness*4;
       const path=t<.84?{kind:'arrive',gate,headLength:H,distance:-clear+smooth(t/.84)*(clear+TAU*ring.radius+H)}:0;
       flights.push({group:path?chainCreatures(ring,this.orders[channel],0,this.skins,weights,this.stretchFor(path,ring)).filter(c=>!c.ghost&&c.length>.5):group,camera,path});others=others.filter(c=>c.channel!==channel);
@@ -256,10 +273,14 @@ export class EngravingRenderer {
     // A snake joining a ring that already sounds flies in head first and coils into the gap opening for it.
     const joining=[];
     for(const [uid,a] of this.arrivals){
-      const t=reduced?1:(this.clock-a.start)/ARRIVE_SECONDS,c=creatures.find(c=>c.uid===uid);
+      const age=this.clock-a.start,t=reduced?1:(age-PASS_SECONDS)/ARRIVE_SECONDS,c=creatures.find(c=>c.uid===uid);
       if(t>=1||!c||finalePose){this.arrivals.delete(uid);continue;}
       const inFocus=focusOn&&c.channel===sel;if(inFocus&&!layout.visible)continue;
       const camera=inFocus?view:remaining,r=Math.max(1,c.radius),H=c.thickness*c.headUnits,own={...c,offset:0,headAngle:c.headAngle-c.offset/r};
+      if(t<0){
+        own.length=Math.max(c.length,c.fullLength||0);
+        joining.push({creature:own,...this.pass(rings[c.channel],own.headAngle,H,own.length,age/PASS_SECONDS)});others=others.filter(o=>o.uid!==uid);continue;
+      }
       const landing=own.headAngle+(rates[c.channel]||0)*(1-t)*ARRIVE_SECONDS-c.length/r,clear=Math.hypot(width,height)/camera.scale+c.thickness*4;
       const final=c.length+H,distance=-clear+smooth(t)*(clear+final),grow=smooth((final-distance)/H);own.length=c.length+Math.max(0,c.fullLength-c.length)*grow;
       joining.push({creature:own,camera,path:{kind:'arrive',gate:landing,headLength:H,distance,final}});
