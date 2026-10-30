@@ -4,15 +4,15 @@ import {CreatureLife} from './creature-state.mjs?v=chains-2';
 import {SPELLS,SPELL_WORDS} from './spell-book.mjs?v=chains-2';
 import {RING_NAMES,SPECIES,parseCommand,nextCell,cellLabel} from './chain-model.mjs?v=chains-2';
 import {TouchPinch} from './touch-pinch.mjs';
-import {mobileLayout,ritualSize} from './ritual-geometry.mjs?v=chains-3';
+import {mobileLayout,ritualSize} from './ritual-geometry.mjs?v=chains-4';
 import {WheelScratch} from './wheel-scratch.mjs';
 import {PinchScale,MIN_SCALE} from './pinch-scale.mjs?v=ritual-9';
 import {HandMotion,ScratchResponse,SCRATCH_INPUT} from './scratch-motion.mjs';
-import {RINGS,TAU,ringMetrics,bodyPoint,project,unproject,BodyIntent,controlRect,grid} from './body-geometry.mjs?v=chains-3';
+import {RINGS,TAU,ringMetrics,bodyPoint,project,unproject,BodyIntent,controlRect,grid} from './body-geometry.mjs?v=chains-4';
 import {shortcut} from './input-shortcuts.mjs?v=chains-2';
 import {ViewState,Finale} from './view-state.mjs?v=chains-2';
 import {InkMass} from './ink-physics.mjs?v=chains-2';
-import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-5';
+import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-7';
 
 const $=id=>document.getElementById(id),root=$('ouroboros'),stage=$('stage'),canvas=$('canvas'),inkButton=$('ink'),probe=$('audio-state'),panel=$('channel-panel'),minimap=$('minimap'),dialog=$('sound-dialog');
 const voicePanel=$('voice-panel'),spellLine=$('spell-line'),spellInput=$('spell-input'),feedback=$('spell-feedback'),life=new CreatureLife(),touchPinch=new TouchPinch();
@@ -278,13 +278,13 @@ function updateViewUi(scene){
   // Desktop: the line lives in the first two grid columns, the log in the last two.
   const g=grid(width),lineWidth=mobile?Math.min(330,width-40):Math.max(240,g.span(2));
   const focusLine=p>.5&&finale.state==='ready';
-  const lineY=focusLine?(mobile?scene.mini.y+scene.mini.size+6:Math.max(20,controlRect(width,height).y-118)):(mobile?height*.77:(height-spellLine.offsetHeight)/2);
+  const lineY=focusLine?(mobile?scene.mini.y+scene.mini.size+8:Math.max(20,controlRect(width,height).y-118)):(mobile?height*.77:(height-spellLine.offsetHeight)/2);
   // Keep the whole line block on screen, and above the on-screen keyboard when it is open.
   const vv=window.visualViewport,visibleBottom=vv?Math.min(height,vv.offsetTop+vv.height-stage.getBoundingClientRect().top):height;
   const lineTop=Math.max(8,Math.min(lineY,visibleBottom-spellLine.offsetHeight-8));
   Object.assign(spellLine.style,{left:(mobile?(width-lineWidth)/2:g.x(0))+'px',top:lineTop+'px',width:lineWidth+'px'});
-  const logTop=scene.miniActive&&!mobile?scene.mini.y+scene.mini.size+24:24;
-  spellLog.hidden=mobile;Object.assign(spellLog.style,{left:g.x(5)+'px',width:g.span(2)+'px',top:logTop+'px',height:Math.max(0,height-logTop-24)+'px'});
+  // The log keeps the full height of its columns; the miniature sits top centre, as on the phone.
+  spellLog.hidden=mobile;Object.assign(spellLog.style,{left:g.x(5)+'px',width:g.span(2)+'px',top:'16px',height:Math.max(0,height-32)+'px'});
   // Desktop: while a snake's settings fill the first two columns the line steps aside.
   spellLine.hidden=finale.state==='closing'||(!mobile&&focusLine);
   minimap.setAttribute('aria-label',mobile?'Вся композиция. Нажми, чтобы вернуться.':'Остальные кольца. Нажми, чтобы вернуться.');

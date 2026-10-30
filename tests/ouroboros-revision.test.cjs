@@ -37,7 +37,7 @@ test('presentation has a fully absent selected body, continuous layout movement 
     const leaving=presentation(1366,768,300,ring,{...state,progress:.01}),nose=bodyPoint(ring,-ring.thickness*HEAD_UNITS),moved=bodyPoint(ring,-ring.thickness*HEAD_UNITS,leaving.path);
     assert.ok(-nose.tx*(moved.x-nose.x)-nose.ty*(moved.y-nose.y)>0,'the head moves forward along its own tangent, no alignment turn');
     const start=presentation(1366,768,300,ring,{...state,progress:0}),focus=presentation(1366,768,300,ring,{...state,progress:1});
-    assert.equal(start.remaining.scale,1);assert.ok(focus.remaining.scale<.4);assert.ok(focus.remaining.tx>1100&&focus.remaining.ty<180);
+    assert.equal(start.remaining.scale,1);assert.ok(focus.remaining.scale<.4);assert.ok(Math.abs(focus.remaining.tx-683)<1&&focus.remaining.ty<180);
   }
 });
 

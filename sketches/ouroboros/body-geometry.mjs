@@ -72,7 +72,7 @@ export function controlRect(width,height){
 // head first back into the overview, landing where the music has carried them.
 export function presentation(width,height,baseRadius,ring,viewState){
   const p=viewState.progress,closing=!!viewState.closing&&p>0,overview={scale:1,rotation:0,tx:width/2,ty:height*.51};
-  const g=grid(width),miniSize=Math.min(230,Math.max(120,g.span(2))),mini={x:g.x(5)+(g.span(2)-miniSize)/2,y:30,size:miniSize};
+  const g=grid(width),miniSize=Math.min(230,Math.max(120,g.span(2))),mini={x:(width-miniSize)/2,y:16,size:miniSize};
   const miniScale=mini.size/(baseRadius*2.55),move=closing?smooth((p-.5)/.15):smooth((p-.33)/.2);
   const remaining={scale:1+(miniScale-1)*move,rotation:0,tx:overview.tx+(mini.x+mini.size/2-overview.tx)*move,ty:overview.ty+(mini.y+mini.size/2-overview.ty)*move};
   const focus=camera(width,height,baseRadius,ring,1),H=ring.thickness*(ring.headUnits??HEAD_UNITS),radius=Math.max(1,ring.radius);

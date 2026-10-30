@@ -1,4 +1,4 @@
-import {TAU,ATLAS,HEAD_UNITS,MOUTH_UNITS,bodyPoint,presentation,project,unproject,grid} from './body-geometry.mjs?v=chains-3';
+import {TAU,ATLAS,HEAD_UNITS,MOUTH_UNITS,bodyPoint,presentation,project,unproject,grid} from './body-geometry.mjs?v=chains-4';
 import {CREATURES,PHRASE_BEATS} from './ritual-model.mjs';
 import {clamp,angleDelta} from './score.mjs';
 export const mobileLayout=(w,h)=>w<700||(h<520&&w<1000);
@@ -49,7 +49,7 @@ export function ritualPresentation(w,h,base,ring,state){
   const layout=presentation(w,h,base,ring,state);
   if(!mobileLayout(w,h))return {...layout,mobile:false};
   const p=state.progress,closing=!!layout.closing,overview={scale:1,rotation:0,tx:w/2,ty:h*.45};
-  const miniSize=Math.min(146,Math.max(92,h*.19)),mini={x:(w-miniSize)/2,y:12+(state.safeTop||0),size:miniSize};
+  const miniSize=Math.min(146,Math.max(92,h*.19)),mini={x:(w-miniSize)/2,y:8+(state.safeTop||0),size:miniSize};
   const move=closing?smooth((p-.5)/.15):smooth((p-.33)/.2),miniScale=miniSize/(base*2.5);
   const remaining={scale:1+(miniScale-1)*move,rotation:0,tx:w/2,ty:overview.ty+(mini.y+miniSize/2-overview.ty)*move};
   const skinWidth=clamp(w*.21,68,96),zoom=skinWidth/Math.max(1,ring.baseWidth);
