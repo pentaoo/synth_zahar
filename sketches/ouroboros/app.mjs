@@ -281,18 +281,18 @@ function updateViewUi(scene){
   // Desktop: the line lives in the first two grid columns, the log in the last two.
   const g=grid(width),lineWidth=mobile?Math.min(330,width-40):Math.max(240,g.span(2));
   const focusLine=p>.5&&finale.state==='ready';
-  const lineY=focusLine?(mobile?scene.mini.y+scene.mini.size+8:Math.max(20,controlRect(width,height).y-118)):(mobile?height*.77:(height-spellLine.offsetHeight)/2);
+  // Desktop overview: the line takes the miniature's place at the top of the last two columns.
+  const lineY=focusLine?(mobile?scene.mini.y+scene.mini.size+8:Math.max(20,controlRect(width,height).y-118)):(mobile?height*.77:16);
   // Keep the whole line block on screen, and above the on-screen keyboard when it is open.
   const vv=window.visualViewport,visibleBottom=vv?Math.min(height,vv.offsetTop+vv.height-stage.getBoundingClientRect().top):height;
   const lineTop=Math.max(8,Math.min(lineY,visibleBottom-spellLine.offsetHeight-8));
-  Object.assign(spellLine.style,{left:(mobile?(width-lineWidth)/2:g.x(0))+'px',top:lineTop+'px',width:lineWidth+'px'});
-  // Desktop: the log runs down the last two columns from under the miniature to 16px above the bottom.
-  const logTop=scene.mini.y+scene.mini.size;
+  Object.assign(spellLine.style,{left:(mobile?(width-lineWidth)/2:g.x(5))+'px',top:lineTop+'px',width:lineWidth+'px'});
+  // Desktop: the log runs down the last two columns from under the line (overview)
+  // or the miniature (open ring) to 16px above the bottom.
+  const logTop=focusLine?scene.mini.y+scene.mini.size:lineTop+spellLine.offsetHeight+16;
   spellLog.hidden=mobile;Object.assign(spellLog.style,{left:g.x(5)+'px',width:g.span(2)+'px',top:logTop+'px',height:Math.max(0,height-logTop-16)+'px'});
-  // Desktop: while a snake's settings fill the first two columns the line steps aside.
-  // In the overview it stays invisible until a key is typed or Tab reaches it.
+  // Desktop: in an open ring the miniature holds the top of the column and the line steps aside.
   spellLine.hidden=finale.state==='closing'||(!mobile&&focusLine);
-  spellLine.classList.toggle('idle',!mobile&&!spellInput.value&&document.activeElement!==spellInput);
   minimap.setAttribute('aria-label',mobile?'Вся композиция. Нажми, чтобы вернуться.':'Остальные кольца. Нажми, чтобы вернуться.');
   panel.hidden=p<.97||view.target===0||finale.state!=='ready';if(!voicePanel.hidden&&(p>0||finale.state!=='ready'))toggleVoice(false);minimap.hidden=!scene.miniActive||finale.state!=='ready';inkButton.hidden=p>0||finale.state!=='ready';
   root.dataset.view=p>.1?'focus':'overview';

@@ -48,7 +48,7 @@ input[type="range"]::-moz-range-thumb{width:9px;height:9px;border:0;background:#
 .spell-line{position:absolute;z-index:9;width:310px;max-width:calc(100vw - 40px);color:#000}
 #spell-form{display:flex;border-bottom:1px solid #000;align-items:center}
 #spell-input{width:100%;min-width:0;border:0;outline:0;background:transparent;font:var(--type-large);padding:4px 0 6px;border-radius:0}
-#spell-input::placeholder{color:#000;opacity:.55}
+#spell-input::placeholder{color:#8c8c8c;opacity:1}
 #spell-form button{font:var(--type-large);min-width:44px;min-height:44px}
 .spell-lexicon{display:flex;flex-wrap:wrap;gap:2px 12px;margin-top:6px;align-items:center;font:var(--type-caption)}
 .spell-lexicon button{padding:5px 0;font:var(--type-caption)}
@@ -79,9 +79,6 @@ dialog .shortcuts{font:var(--type-caption)}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 
 .spell-line[hidden]{display:none}
-/* Desktop overview: the line is not drawn until someone types or tabs into it. */
-.spell-line.idle{opacity:0;pointer-events:none}
-.spell-line.idle:focus-within{opacity:1}
 [data-view="focus"] .spell-lexicon{display:none}
 .rune-help{font:var(--type-micro);margin:0 0 12px}
 [data-mobile="true"] .rune-help{display:none}
