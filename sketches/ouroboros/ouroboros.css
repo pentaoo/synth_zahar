@@ -1,4 +1,6 @@
-:root{color-scheme:light;--paper:#fff;--ink:#000;--serif:Georgia,"Times New Roman",serif;
+:root{color-scheme:light;--paper:#fff;--ink:#000;
+  /* Colour rule: only pure black #000 and pure white #fff, no greys or tints. */
+  --serif:Georgia,"Times New Roman",serif;
   /* Seven text styles. Every text on the page uses one of them. */
   --type-title:400 28px/1.1 var(--serif);   /* Заголовок: имя кольца и змеи, заголовок окна */
   --type-large:400 24px/1.2 var(--serif);   /* Крупный: строка заклинаний, знаки ↵ и × */
@@ -48,7 +50,7 @@ input[type="range"]::-moz-range-thumb{width:9px;height:9px;border:0;background:#
 .spell-line{position:absolute;z-index:9;width:310px;max-width:calc(100vw - 40px);color:#000}
 #spell-form{display:flex;border-bottom:1px solid #000;align-items:center}
 #spell-input{width:100%;min-width:0;border:0;outline:0;background:transparent;font:var(--type-large);padding:4px 0 6px;border-radius:0}
-#spell-input::placeholder{color:#8c8c8c;opacity:1}
+#spell-input::placeholder{color:#000;opacity:1}
 /* Desktop: a quiet line, no tags and no ↵ — Enter speaks. */
 [data-mobile="false"] #spell-input{font:var(--type-lead);padding:4px 0 6px}
 [data-mobile="false"] #spell-form button,[data-mobile="false"] .spell-lexicon{display:none}
@@ -97,13 +99,14 @@ dialog .shortcuts{font:var(--type-caption)}
 [data-mobile="true"] .spell-lexicon button{flex:none;font:var(--type-body)}
 [data-mobile="true"] .spell-lexicon .lexicon-gap{width:10px;flex:none}
 [data-mobile="true"] #spell-feedback{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
-/* The log: everything entered in the line, small and centred in the last two
-   grid columns under the miniature, one entry per line, ragged on both sides.
-   The foot of the column fades to white (322px in the layout); the padding
-   keeps the newest entry above the fade once the log is long. */
-.spell-log{position:absolute;z-index:4;overflow:hidden;pointer-events:none;--fade:min(322px,40%);-webkit-mask-image:linear-gradient(#000 calc(100% - var(--fade)),transparent);mask-image:linear-gradient(#000 calc(100% - var(--fade)),transparent)}
+/* The log: everything entered in the line, small and centred in the right
+   column, one entry per line, ragged on both sides. Nothing clips it: the
+   text runs on down the page and a white fade over the last 322px of the
+   screen lets it dissolve instead of being cut. */
+.spell-log{position:absolute;z-index:4;pointer-events:none}
+.spell-log::after{content:"";position:absolute;left:0;right:0;bottom:-16px;height:min(322px,40vh);background:linear-gradient(rgba(255,255,255,0),#fff);pointer-events:none}
 .spell-log[hidden]{display:none}
-.spell-log .scroll{background:#fff;padding-bottom:min(322px,40vh)}
+.spell-log .scroll{background:#fff}
 .spell-log p{margin:0;font:var(--type-log);text-align:center;overflow-wrap:anywhere}
 .spell-log p span{display:block}
 /* Desktop: nothing is written on the left; what was said goes to the log. */

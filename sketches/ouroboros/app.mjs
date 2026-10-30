@@ -13,7 +13,7 @@ import {shortcut} from './input-shortcuts.mjs?v=chains-2';
 import {ViewState,Finale} from './view-state.mjs?v=chains-2';
 import {InkMass} from './ink-physics.mjs?v=chains-2';
 import {Typewriter} from './invitations.mjs?v=chains-2';
-import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-9';
+import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-10';
 
 const $=id=>document.getElementById(id),root=$('ouroboros'),stage=$('stage'),canvas=$('canvas'),inkButton=$('ink'),probe=$('audio-state'),panel=$('channel-panel'),minimap=$('minimap'),dialog=$('sound-dialog');
 const voicePanel=$('voice-panel'),spellLine=$('spell-line'),spellInput=$('spell-input'),feedback=$('spell-feedback'),life=new CreatureLife(),touchPinch=new TouchPinch();
@@ -377,14 +377,11 @@ function turnRune(hit,step){
   selectedUid=snake.uid;if(write(snake.uid,cells))message(snake.name+' · '+(hit.index+1)+' доля: '+cellLabel(snake.channel,cells[hit.index])+' · со следующего прохода');
 }
 // The log of this game: everything entered in the line, small and centred,
-// each entry on its own line, the newest at the bottom. A long log scrolls so
-// the newest entry sits just above the white fade at the foot of the column.
+// each entry on its own line, the newest at the bottom; it is never clipped.
 const spellLog=$('spell-log'),scrollText=$('spell-log-text');
-function layoutScroll(){if(!spellLog.hidden)spellLog.scrollTop=spellLog.scrollHeight;}
 function logLine(text){
   const line=document.createElement('span');line.textContent=text;scrollText.append(line);
   while(scrollText.childElementCount>200)scrollText.firstElementChild.remove();
-  layoutScroll();
 }
 // The empty line retypes its invitation; it rests while someone writes in it.
 const typewriter=new Typewriter(),reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
@@ -401,7 +398,6 @@ $('spell-form').addEventListener('submit',async e=>{
   e.preventDefault();if(casting||!spellInput.value.trim())return;
   logLine(spellInput.value.trim());await runLine();spellInput.value='';renderLexicon();
 });
-window.addEventListener('resize',()=>requestAnimationFrame(layoutScroll));
 async function runLine(){
   const text=spellInput.value,focus=view.progress>.5&&view.target===1,snake=snakeOf(selectedUid);
   if(/^\s*голос\s*$/i.test(text)){spellInput.value='';audio.speakWord(text);toggleVoice(true);return;}

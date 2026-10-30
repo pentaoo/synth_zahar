@@ -71,9 +71,10 @@ export class EngravingRenderer {
     }
   }
   makeGrain(){
-    const c=document.createElement('canvas');c.width=c.height=512;const x=c.getContext('2d');x.fillStyle='#070707';x.fillRect(0,0,512,512);
+    const c=document.createElement('canvas');c.width=c.height=512;const x=c.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,512,512);
+    // Only pure black and white (author's rule): white specks on black ink.
     let seed=7219;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-    for(let i=0;i<18000;i++){const px=random()*512,py=random()*512,r=.25+random()*.65;x.fillStyle=i%4?'#272727':'#e9e9e9';x.beginPath();x.ellipse(px,py,r,r*.65,random()*3,0,TAU);x.fill();}
+    x.fillStyle='#fff';for(let i=0;i<18000;i++){const px=random()*512,py=random()*512,r=.25+random()*.65,a=random()*3;if(i%4)continue;x.beginPath();x.ellipse(px,py,r,r*.65,a,0,TAU);x.fill();}
     return c;
   }
   resize(width,height,dpr){this.width=width;this.height=height;this.dpr=Math.min(2,dpr||1);for(const c of [this.canvas,this.inkCanvas]){c.width=Math.round(width*this.dpr);c.height=Math.round(height*this.dpr);}this.gl.viewport(0,0,this.canvas.width,this.canvas.height);this.gl.clearColor(1,1,1,1);this.gl.clear(this.gl.COLOR_BUFFER_BIT);this.ctx.setTransform(this.dpr,0,0,this.dpr,0,0);this.pattern=this.ctx.createPattern(this.grain,'repeat');}
