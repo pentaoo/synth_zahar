@@ -1,5 +1,5 @@
-import {TAU,RINGS,ringMetrics,collapsePresentation,project,unproject} from './body-geometry.mjs?v=chains-3';
-import {chainCreatures,chainShares,creaturePoint,sampleCreature,ritualPresentation,hitCreature,eyePoint} from './ritual-geometry.mjs?v=chains-3';
+import {TAU,RINGS,ringMetrics,collapsePresentation,project,unproject} from './body-geometry.mjs?v=chains-4';
+import {chainCreatures,chainShares,creaturePoint,sampleCreature,ritualPresentation,hitCreature,eyePoint} from './ritual-geometry.mjs?v=chains-4';
 import {SPECIES,CELLS,runeFor} from './chain-model.mjs?v=chains-2';
 import {angleDelta} from './score.mjs';
 const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
@@ -26,6 +26,8 @@ export class EngravingRenderer {
     this.orders=[[],[],[]];this.weights=new Map();this.summons=new Map();this.arrivals=new Map();this.departing=[];this.turns=[0,0,0];this.lastAngles=[null,null,null];this.runeHits=[];this.clock=0;
   }
   async initialize(){
+    // Paper white at once: an alpha:false canvas shows black until its first frame.
+    this.gl.clearColor(1,1,1,1);this.gl.clear(this.gl.COLOR_BUFFER_BIT);
     const manifest=await (await fetch(new URL('./assets/ritual/skins.json?v=chains-2',import.meta.url))).json();
     this.skins=manifest;this.assets={};
     const gl=this.gl;
@@ -54,15 +56,19 @@ export class EngravingRenderer {
     for(const [name,size,offset] of [['a_position',2,0],['a_uv',2,8]]){const at=gl.getAttribLocation(this.program,name);gl.enableVertexAttribArray(at);gl.vertexAttribPointer(at,size,gl.FLOAT,false,16,offset);}
     this.uniforms={};for(const key of ['u_view','u_resolution','u_alpha','u_skin','u_crop','u_eye','u_life','u_tile'])this.uniforms[key]=gl.getUniformLocation(this.program,key);
     const texture=image=>{const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);gl.generateMipmap(gl.TEXTURE_2D);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);return t;};
-    // Upload one atlas at a time. Retain only its head alpha, not six full RGBA copies.
-    for(const creature of SPECIES){
-      const im=await loadImage(new URL(`./assets/ritual/${creature.id}.png?v=ritual-5`,import.meta.url)),mask=document.createElement('canvas');
+    // The opening snake downloads alone and drawing starts as soon as it is in;
+    // the other atlases then download together. Retain only each head's alpha.
+    const first=SPECIES.find(s=>s.channel===1)||SPECIES[0],order=[first,...SPECIES.filter(s=>s!==first)];
+    const load=creature=>loadImage(new URL(`./assets/ritual/${creature.id}.png?v=ritual-6`,import.meta.url)),opening=load(first);
+    const images=[opening,...order.slice(1).map(creature=>opening.then(()=>load(creature)))];
+    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+    for(const [k,creature] of order.entries()){
+      const im=await images[k],mask=document.createElement('canvas');
       const maskWidth=Math.ceil(im.width*this.skins[creature.id].neck);mask.width=maskWidth;mask.height=im.height;
       const mc=mask.getContext('2d',{willReadFrequently:true});mc.drawImage(im,0,0);
       const rgba=mc.getImageData(0,0,maskWidth,im.height).data,alpha=new Uint8Array(maskWidth*im.height);for(let i=0;i<alpha.length;i++)alpha[i]=rgba[i*4+3];
-      this.assets[creature.id]={width:im.width,height:im.height,maskWidth,alpha,texture:texture(im)};
+      this.assets[creature.id]={width:im.width,height:im.height,maskWidth,alpha,texture:texture(im)};this.ready=true;
     }
-    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);this.ready=true;
   }
   makeGrain(){
     const c=document.createElement('canvas');c.width=c.height=512;const x=c.getContext('2d');x.fillStyle='#070707';x.fillRect(0,0,512,512);
@@ -70,7 +76,7 @@ export class EngravingRenderer {
     for(let i=0;i<18000;i++){const px=random()*512,py=random()*512,r=.25+random()*.65;x.fillStyle=i%4?'#272727':'#e9e9e9';x.beginPath();x.ellipse(px,py,r,r*.65,random()*3,0,TAU);x.fill();}
     return c;
   }
-  resize(width,height,dpr){this.width=width;this.height=height;this.dpr=Math.min(2,dpr||1);for(const c of [this.canvas,this.inkCanvas]){c.width=Math.round(width*this.dpr);c.height=Math.round(height*this.dpr);}this.gl.viewport(0,0,this.canvas.width,this.canvas.height);this.ctx.setTransform(this.dpr,0,0,this.dpr,0,0);this.pattern=this.ctx.createPattern(this.grain,'repeat');}
+  resize(width,height,dpr){this.width=width;this.height=height;this.dpr=Math.min(2,dpr||1);for(const c of [this.canvas,this.inkCanvas]){c.width=Math.round(width*this.dpr);c.height=Math.round(height*this.dpr);}this.gl.viewport(0,0,this.canvas.width,this.canvas.height);this.gl.clearColor(1,1,1,1);this.gl.clear(this.gl.COLOR_BUFFER_BIT);this.ctx.setTransform(this.dpr,0,0,this.dpr,0,0);this.pattern=this.ctx.createPattern(this.grain,'repeat');}
   setCamera(view){
     this.currentView=view;const gl=this.gl,c=Math.cos(view.rotation)*view.scale,s=Math.sin(view.rotation)*view.scale;
     const m=this.matrix;m[0]=c;m[1]=s;m[2]=0;m[3]=-s;m[4]=c;m[5]=0;m[6]=view.tx;m[7]=view.ty;m[8]=1;
@@ -121,7 +127,7 @@ export class EngravingRenderer {
   headHit(point,creatures,view,path=0){
     const p=unproject(point,view);
     for(const ring of creatures){
-      const atlas=ring.skin,asset=this.assets[ring.id];if(ring.thickness<.01)continue;
+      const atlas=ring.skin,asset=this.assets[ring.id];if(!asset||ring.thickness<.01)continue;
       for(let j=0;j<=48;j++){
         const material=(j/48-1)*ring.thickness*ring.headUnits,a=creaturePoint(ring,material,path),dx=p.x-a.x,dy=p.y-a.y;
         const along=dx*a.tx+dy*a.ty;if(Math.abs(along)>ring.thickness*ring.headUnits/48)continue;
@@ -288,7 +294,7 @@ export class EngravingRenderer {
     }
     const chosenDrawn=chosen.filter(c=>!joining.some(j=>j.creature.uid===c.uid));
     gl.disable(gl.SCISSOR_TEST);gl.clearColor(1,1,1,1);gl.clear(gl.COLOR_BUFFER_BIT);gl.useProgram(this.program);gl.uniform2f(this.uniforms.u_resolution,width,height);this.ctx.clearRect(0,0,width,height);
-    const draw=(group,camera,path,small=false)=>{for(const c of group)this.body(c,camera,path,1,scratch,ink,reduced,small);this.setCamera(camera);for(const c of group)this.head(c,1,path,small);};
+    const draw=(group,camera,path,small=false)=>{group=group.filter(c=>this.assets[c.id]);for(const c of group)this.body(c,camera,path,1,scratch,ink,reduced,small);this.setCamera(camera);for(const c of group)this.head(c,1,path,small);};
     if(focusOn&&layout.visible)draw(chosenDrawn,view,bend);
     draw(others,remaining,0,p>.54);
     for(const f of flights)draw(f.group,f.camera,f.path);
