@@ -97,7 +97,7 @@ export class EngravingRenderer {
       const rise=reduced?0:(local*w*(.16+.2*tooth)+tension*w*.045*tooth*neck);
       const lean=reduced?0:local*scratch.direction*w*.12;
       const press=ring.index===2&&bend===0?ink.pressureAt(angle)*w*.22*neck:0;
-      const tail=ring.length-material,taper=tail<ring.baseWidth*2.7?Math.max(.10,tail/(ring.baseWidth*2.7)):1;
+      const tail=Math.max(ring.length,ring.fullLength||0)-material,taper=tail<ring.baseWidth*2.7?Math.max(.10,tail/(ring.baseWidth*2.7)):1;
       for(let side=0;side<2;side++){
         const amount=(side===0?-1:1)*w*.5*taper-(side===0?rise:0)-press;
         const k=(j*2+side)*4;v[k]=p.x+p.ty*amount+(side===0?p.tx*lean:0);v[k+1]=p.y-p.tx*amount+(side===0?p.ty*lean:0);v[k+2]=material/ring.tileLength;v[k+3]=side;
@@ -148,7 +148,7 @@ export class EngravingRenderer {
     for(const d of ink.droplets){ctx.beginPath();ctx.ellipse(d.x,d.y,d.r,d.r*.82,Math.atan2(d.vy,d.vx),0,TAU);ctx.fill();}
     ctx.restore();
   }
-  // A summoned snake comes from far left, very large, head first, and coils into its ring.
+  // A summoned snake flies straight in along the tangent, head first, and coils into its ring.
   summon(channel,uid,created){
     this.weights.set(uid,{w:created?1:0,target:1});
     if(created)this.summons.set(channel,{start:this.clock,uid});else this.arrivals.set(uid,{start:this.clock,channel});
@@ -184,14 +184,8 @@ export class EngravingRenderer {
   // How far a flying chain has grown back to its full length (the pinch swallows material).
   stretchFor(path,ring){
     if(!path||typeof path!=='object')return 0;const H=ring.thickness*(ring.headUnits||1);
-    if(path.kind==='depart')return smooth(path.distance/(ring.fullLength*.5+H));
-    return path.distance<=0?1:1-smooth(path.distance/(TAU*ring.radius+H));
-  }
-  summonView(ring,gate,t,overview){
-    const {width,height}=this,Z0=Math.max(1.5,Math.min(16,height*.34/Math.max(1,ring.thickness))),k=smooth((t-.36)/.64),z=Math.exp(Math.log(Z0)*(1-k));
-    const rotation=wrapAngle(-(gate+Math.PI/2))*(1-k),F={x:Math.cos(gate)*ring.radius,y:Math.sin(gate)*ring.radius},end=project(F,overview);
-    const A={x:width*.36+(end.x-width*.36)*k,y:height*.5+(end.y-height*.5)*k},c=Math.cos(rotation),s=Math.sin(rotation);
-    return {view:{scale:z,rotation,tx:A.x-z*(F.x*c-F.y*s),ty:A.y-z*(F.x*s+F.y*c)},clear:width*.36/Z0+ring.thickness*3};
+    if(path.kind==='depart')return smooth(path.distance/H);
+    const final=path.final??TAU*ring.radius+H;return smooth((final-path.distance)/H);
   }
   // The inscription sits still inside the ring's visible arc, read left to right,
   // while the snake keeps moving with the record. One rune per beat.
@@ -248,16 +242,15 @@ export class EngravingRenderer {
     const chosen=stretch>0?chainCreatures(selectedRing,order,lead,this.skins,weights,stretch).filter(c=>!c.ghost&&c.length>.5):creatures.filter(c=>c.channel===sel);
     let others=creatures.filter(c=>!focusOn||c.channel!==sel);if(!focusOn)bend=0;
     if(bend&&chosen[0])bend={...bend,headLength:chosen[0].thickness*chosen[0].headUnits};
-    // Summon flights: the camera starts close on the gate and ends on the overview.
+    // Summon flights: on the overview camera, like the return from the large view.
     const flights=[];
     for(const [channel,summon] of this.summons){
       const t=reduced?1:(this.clock-summon.start)/SUMMON_SECONDS;
       if(t>=1||!rings[channel].thickness||(focusOn&&channel===sel)||finalePose){this.summons.delete(channel);continue;}
       const ring=rings[channel],group=others.filter(c=>c.channel===channel);if(!group.length)continue;
       const H=group[0].thickness*group[0].headUnits,gate=ring.headAngle+(rates[channel]||0)*Math.max(0,.84-t)*SUMMON_SECONDS;
-      const {view:camera,clear}=this.summonView(ring,gate,t,focusOn?remaining:overview);
-      const enter=1-(1-Math.min(1,t/.34))**3,coil=smooth((t-.34)/.5);
-      const path=t<.84?{kind:'arrive',gate,headLength:H,distance:-clear+enter*clear+coil*(TAU*ring.radius+H)}:0;
+      const camera=focusOn?remaining:overview,clear=Math.hypot(width,height)/camera.scale+ring.thickness*4;
+      const path=t<.84?{kind:'arrive',gate,headLength:H,distance:-clear+smooth(t/.84)*(clear+TAU*ring.radius+H)}:0;
       flights.push({group:path?chainCreatures(ring,this.orders[channel],0,this.skins,weights,this.stretchFor(path,ring)).filter(c=>!c.ghost&&c.length>.5):group,camera,path});others=others.filter(c=>c.channel!==channel);
     }
     // A snake joining a ring that already sounds flies in head first and coils into the gap opening for it.
@@ -268,8 +261,8 @@ export class EngravingRenderer {
       const inFocus=focusOn&&c.channel===sel;if(inFocus&&!layout.visible)continue;
       const camera=inFocus?view:remaining,r=Math.max(1,c.radius),H=c.thickness*c.headUnits,own={...c,offset:0,headAngle:c.headAngle-c.offset/r};
       const landing=own.headAngle+(rates[c.channel]||0)*(1-t)*ARRIVE_SECONDS-c.length/r,clear=Math.hypot(width,height)/camera.scale+c.thickness*4;
-      const distance=-clear+smooth(t)*(clear+c.length+H),grow=distance<=0?1:1-smooth(distance/(c.length+H));own.length=c.length+Math.max(0,c.fullLength-c.length)*grow;
-      joining.push({creature:own,camera,path:{kind:'arrive',gate:landing,headLength:H,distance}});
+      const final=c.length+H,distance=-clear+smooth(t)*(clear+final),grow=smooth((final-distance)/H);own.length=c.length+Math.max(0,c.fullLength-c.length)*grow;
+      joining.push({creature:own,camera,path:{kind:'arrive',gate:landing,headLength:H,distance,final}});
       others=others.filter(o=>o.uid!==uid);
     }
     const chosenDrawn=chosen.filter(c=>!joining.some(j=>j.creature.uid===c.uid));
@@ -280,7 +273,7 @@ export class EngravingRenderer {
     for(const f of flights)draw(f.group,f.camera,f.path);
     for(const j of joining)draw([j.creature],j.camera,j.path);
     this.departing=this.departing.filter(d=>{
-      const t=reduced?1:(this.clock-d.start)/DEPART_SECONDS;if(t>=1)return false;const c={...d.creature},H=c.thickness*c.headUnits;c.length+=Math.max(0,c.fullLength-c.length)*smooth(t*2);
+      const t=reduced?1:(this.clock-d.start)/DEPART_SECONDS;if(t>=1)return false;const c={...d.creature},H=c.thickness*c.headUnits;c.length+=Math.max(0,c.fullLength-c.length)*smooth(t*8);
       draw([c],d.camera,{kind:'depart',gate:d.gate,headLength:H,distance:smooth(t)*(c.length+H+Math.hypot(width,height)/d.camera.scale+c.thickness*4)});return true;
     });
     const windowRadius=Math.max(0,rings[2].radius-rings[2].thickness*.65);this.ink(ink,remaining,windowRadius,1);

@@ -3,7 +3,7 @@ import {SpellBook} from './spell-book.mjs?v=chains-2';
 import {CREATURES} from './ritual-model.mjs';
 import {createSpellRack,silentSpells} from './spell-rack.mjs?v=chains-2';
 import {RitualVoice,voiceDefaults,VOICE_RANGES,speakAloud} from './ritual-voice.mjs?v=chains-3';
-import {channelDefaults,channelValue} from './channel-state.mjs';
+import {channelDefaults,channelValue} from './channel-state.mjs?v=chains-3';
 import {Chains} from './chain-model.mjs?v=chains-2';
 import {renderRing,masterStems} from './chain-score.mjs?v=chains-2';
 

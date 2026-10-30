@@ -1,4 +1,4 @@
-import {OuroborosAudio} from './engine.mjs?v=chains-3';
+import {OuroborosAudio} from './engine.mjs?v=chains-4';
 import {clamp,wrap} from './folk-score.mjs?v=ritual-10';
 import {CreatureLife} from './creature-state.mjs?v=chains-2';
 import {SPELLS,SPELL_WORDS} from './spell-book.mjs?v=chains-2';
@@ -12,7 +12,7 @@ import {RINGS,TAU,ringMetrics,bodyPoint,project,unproject,BodyIntent,controlRect
 import {shortcut} from './input-shortcuts.mjs?v=chains-2';
 import {ViewState,Finale} from './view-state.mjs?v=chains-2';
 import {InkMass} from './ink-physics.mjs?v=chains-2';
-import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-2';
+import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-3';
 
 const $=id=>document.getElementById(id),root=$('ouroboros'),stage=$('stage'),canvas=$('canvas'),inkButton=$('ink'),probe=$('audio-state'),panel=$('channel-panel'),minimap=$('minimap'),dialog=$('sound-dialog');
 const voicePanel=$('voice-panel'),spellLine=$('spell-line'),spellInput=$('spell-input'),feedback=$('spell-feedback'),life=new CreatureLife(),touchPinch=new TouchPinch();
