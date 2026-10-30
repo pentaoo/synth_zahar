@@ -2,7 +2,7 @@ import {renderScore,clamp,DEFAULT_WAVES,BPM} from './folk-score.mjs?v=ritual-10'
 import {SpellBook} from './spell-book.mjs?v=chains-2';
 import {CREATURES} from './ritual-model.mjs';
 import {createSpellRack,silentSpells} from './spell-rack.mjs?v=chains-2';
-import {RitualVoice,voiceDefaults,VOICE_RANGES} from './ritual-voice.mjs?v=chains-2';
+import {RitualVoice,voiceDefaults,VOICE_RANGES,speakAloud} from './ritual-voice.mjs?v=chains-3';
 import {channelDefaults,channelValue} from './channel-state.mjs';
 import {Chains} from './chain-model.mjs?v=chains-2';
 import {renderRing,masterStems} from './chain-score.mjs?v=chains-2';
@@ -132,7 +132,7 @@ export class OuroborosAudio {
     }
   }
   castSpell(word,target){
-    const result=this.spells.cast(word,target);if(result.ok){this.updateSpells();this.voice?.say(result.spell.key);}return result;
+    const result=this.spells.cast(word,target);if(result.ok){this.updateSpells();if(!this.voice?.say(result.spell.key))this.speakWord(result.spell.word);}return result;
   }
   // The snake sounding now in each ring, from the record position of that ring.
   activeSnake(index){
@@ -184,6 +184,11 @@ export class OuroborosAudio {
   setVoiceParam(key,value){
     const range=VOICE_RANGES[key];if(!range||!Number.isFinite(value))return false;
     this.voiceSettings[key]=Math.max(range[0],Math.min(range[1],value));this.voice?.configure(this.voiceSettings);return true;
+  }
+  // Every typed word is read aloud: recorded words through the robot chain, the rest by the system voice.
+  speakWord(text){
+    this.voice?.stop();const speech=this.liveSpeech={on:false};
+    return speakAloud(text,this.voiceSettings,{onstart:()=>{speech.on=true;},onend:()=>{speech.on=false;}});
   }
   sayVoice(){return this.voice?.say(this.voice.recitative++%2?'recitative-b':'recitative-a')||false;}
   getChannelState(index){return this.channelSettings[index]?{...this.channelSettings[index]}:null;}
@@ -291,6 +296,7 @@ export class OuroborosAudio {
     out.low=clamp(low/6,0,1);out.high=clamp(high/(this.spectrum.length-56)*3,0,1);out.centroid=total?weighted/total:0;
     for(let i=0;i<3;i++){const channel=this.channels[i];channel.analyser.getFloatTimeDomainData(channel.samples);let sum=0;for(const v of channel.samples)sum+=v*v;out.channels[i]=Math.sqrt(sum/channel.samples.length);}
     if(this.voiceAnalyser){this.voiceAnalyser.getFloatTimeDomainData(this.voiceSamples);let sum=0;for(const v of this.voiceSamples)sum+=v*v;out.voice=clamp(Math.sqrt(sum/this.voiceSamples.length)*9,0,1);}else out.voice=0;
+    if(this.liveSpeech?.on)out.voice=Math.max(out.voice,.3+.25*Math.abs(Math.sin(performance.now()/70)));
     out.bass=clamp(out.channels[0]*8,0,1);out.melody=clamp(out.channels[1]*6,0,1);out.drums=clamp(out.channels[2]*10,0,1);return out;
   }
 }

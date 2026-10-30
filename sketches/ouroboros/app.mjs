@@ -1,4 +1,4 @@
-import {OuroborosAudio} from './engine.mjs?v=chains-2';
+import {OuroborosAudio} from './engine.mjs?v=chains-3';
 import {clamp,wrap} from './folk-score.mjs?v=ritual-10';
 import {CreatureLife} from './creature-state.mjs?v=chains-2';
 import {SPELLS,SPELL_WORDS} from './spell-book.mjs?v=chains-2';
@@ -367,17 +367,14 @@ function turnRune(hit,step){
 $('spell-form').addEventListener('submit',async e=>{
   e.preventDefault();if(casting)return;
   const text=spellInput.value,focus=view.progress>.5&&view.target===1,snake=snakeOf(selectedUid);
-  if(/^\s*голос\s*$/i.test(text)){spellInput.value='';toggleVoice(true);return;}
+  if(/^\s*голос\s*$/i.test(text)){spellInput.value='';audio.speakWord(text);toggleVoice(true);return;}
   const command=parseCommand(text,{spells:SPELLS,channel:focus&&snake?snake.channel:-1});
   if(command.type==='empty')return;
-  if(command.type==='unknown'){
-    feedback.dataset.kind='';spellInput.setAttribute('aria-invalid','true');
-    feedback.textContent=focus?'Не узнаю. Имя змеи, слово ('+SPELL_WORDS+') или руны: 1 2 3 · — 5':'Не узнаю. Имена: '+SPECIES.map(s=>s.name).join(', ')+'. Слова: '+SPELL_WORDS+'. «голос» — настройки голоса.';
-    return;
-  }
   spellInput.removeAttribute('aria-invalid');spellInput.value='';feedback.dataset.kind='';
-  if(command.type==='summon'){summon(command.species);return;}
-  if(command.type==='remove'){removeSnake(command.species);return;}
+  // Every word is read aloud; a word that is also a name or a spell then acts.
+  if(command.type==='unknown'){audio.speakWord(text);feedback.textContent='«'+text.trim()+'»';return;}
+  if(command.type==='summon'){audio.speakWord(text);summon(command.species);return;}
+  if(command.type==='remove'){audio.speakWord(text);removeSnake(command.species);return;}
   if(command.type==='write'){if(write(snake.uid,command.cells))message(snake.name+' · новая надпись · со следующего прохода');return;}
   const to=recipient(command.scope);if(!to.targets.length){message('Некому произнести: в круге нет змей.',true);return;}
   casting=true;feedback.textContent='ᛁ '+command.spell.word+' · ожидает';const ok=await start();casting=false;if(!ok)return;

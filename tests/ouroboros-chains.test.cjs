@@ -96,3 +96,17 @@ test('four more spells and a tunable voice of the abyss',async()=>{
   const {VOICE_RANGES,voiceDefaults}=await import(`${root}/ritual-voice.mjs`);const d=voiceDefaults();
   for(const [key,[lo,hi]] of Object.entries(VOICE_RANGES))assert.ok(d[key]>=lo&&d[key]<=hi,key);
 });
+
+test('every typed word is read aloud: words without a recording go to the system voice',async()=>{
+  const {speakAloud,voiceDefaults}=await import(`${root}/ritual-voice.mjs`);
+  assert.equal(speakAloud('Лёха Жги'),false,'no speech engine, nothing to do');
+  const spoken=[];let cancelled=0;
+  globalThis.SpeechSynthesisUtterance=class{constructor(text){this.text=text;}};
+  globalThis.speechSynthesis={cancel(){cancelled++;},speak(u){spoken.push(u);u.onstart();u.onend();},getVoices:()=>[{name:'Alex',lang:'en-US'},{name:'Milena',lang:'ru-RU'}]};
+  let started=false,ended=false;
+  assert.equal(speakAloud('  Лёха Жги ',voiceDefaults(),{onstart:()=>started=true,onend:()=>ended=true}),true);
+  assert.equal(spoken[0].text,'Лёха Жги');assert.equal(spoken[0].voice.name,'Milena');assert.equal(spoken[0].lang,'ru-RU');
+  assert.ok(started&&ended&&cancelled===1,'a new word cuts the previous one');
+  assert.equal(speakAloud('   '),false);
+  delete globalThis.speechSynthesis;delete globalThis.SpeechSynthesisUtterance;
+});

@@ -4,6 +4,18 @@ const OPTIONAL=['echo','fog','ice','tremble'];
 export const VOICE_RANGES=Object.freeze({level:[0,.6],pitch:[.6,1.4],robot:[0,1],tone:[350,3200],every:[0,64],carrier:[20,140]});
 export const voiceDefaults=()=>({level:.18,pitch:.94,robot:.6,tone:1250,every:16,carrier:43});
 const crush=robot=>{const steps=Math.max(4,Math.round(64-robot*67)),curve=new Float32Array(1024);for(let i=0;i<1024;i++)curve[i]=Math.round(Math.tanh((i/511.5-1)*(1+robot*3.3))*steps)/steps;return curve;};
+// Any typed word without a recording is read by the system voice (Milena where present).
+// It bypasses the robot chain: the browser gives no access to its audio.
+let ruVoice=null;
+const pickVoice=synth=>{const list=synth.getVoices?.()||[];ruVoice=list.find(v=>/milena/i.test(v.name))||list.find(v=>/^ru/i.test(v.lang))||ruVoice;return ruVoice;};
+export function speakAloud(text,settings=voiceDefaults(),{onstart,onend}={}){
+  const synth=globalThis.speechSynthesis,Utterance=globalThis.SpeechSynthesisUtterance,words=String(text).trim();
+  if(!synth||!Utterance||!words)return false;
+  if(!ruVoice){pickVoice(synth);synth.addEventListener?.('voiceschanged',()=>pickVoice(synth),{once:true});}
+  synth.cancel();const u=new Utterance(words);u.lang='ru-RU';if(ruVoice)u.voice=ruVoice;
+  u.pitch=Math.max(.1,Math.min(2,settings.pitch-.4));u.rate=.88;u.volume=Math.max(0,Math.min(1,settings.level/.3));
+  u.onstart=()=>onstart?.();u.onend=u.onerror=()=>onend?.();synth.speak(u);return true;
+}
 export class RitualVoice {
   constructor(context,destination){
     this.context=context;this.destination=destination;this.buffers=new Map();this.active=null;this.nextRecitative=5;this.recitative=0;this.epoch=0;this.spoken=0;this.enabled=true;
