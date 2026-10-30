@@ -8,7 +8,7 @@
   --type-body:400 14px/1.6 var(--serif);    /* Текст: абзацы окна, подписи и теги на телефоне */
   --type-caption:400 12px/1.5 var(--serif); /* Подпись: подписи ползунков, теги, выпадающие списки, кнопки */
   --type-micro:400 11px/1.45 var(--serif);  /* Мелкий: значения, подсказка рун */
-  --type-log:400 8px/2 var(--serif);      /* Лог: всё сказанное, справа */
+  --type-log:400 12px/2 var(--serif);      /* Лог: всё сказанное, справа */
   font:var(--type-body)}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
