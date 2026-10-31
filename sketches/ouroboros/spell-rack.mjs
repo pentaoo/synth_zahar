@@ -9,12 +9,12 @@ export function createSpellRack(c,destination,impulse,{beat=60/78}={}){
   // Свод: a long dark hall.
   const vault=c.createGain(),convolver=c.createConvolver(),tone=c.createBiquadFilter();
   convolver.buffer=impulse;tone.type='lowpass';tone.frequency.value=2100;vault.gain.value=0;
-  input.connect(convolver).connect(tone).connect(vault).connect(output);
+  convolver.connect(tone).connect(vault).connect(output);
   // Ярость: filtered, broken saturation.
   const rage=c.createGain(),drive=c.createWaveShaper(),highpass=c.createBiquadFilter(),lowpass=c.createBiquadFilter();
   const curve=new Float32Array(2048);for(let i=0;i<curve.length;i++){const x=i*2/(curve.length-1)-1;curve[i]=Math.tanh(x*19)*.8+Math.sin(x*31)*.15;}
   drive.curve=curve;drive.oversample='2x';highpass.type='highpass';highpass.frequency.value=210;lowpass.type='lowpass';lowpass.frequency.value=3400;rage.gain.value=0;
-  input.connect(highpass).connect(drive).connect(lowpass).connect(rage).connect(output);
+  highpass.connect(drive).connect(lowpass).connect(rage).connect(output);
   // Расщепление: two drifting short delays.
   const split=c.createGain(),delays=[],oscillators=[];split.gain.value=0;
   for(let i=0;i<2;i++){
@@ -31,18 +31,28 @@ export function createSpellRack(c,destination,impulse,{beat=60/78}={}){
   // Лёд: a thin high band ringing through a tuned comb.
   const ice=c.createGain(),iceBand=c.createBiquadFilter(),comb=c.createDelay(.05),combBack=c.createGain();
   iceBand.type='highpass';iceBand.frequency.value=1300;comb.delayTime.value=1/440;combBack.gain.value=.86;ice.gain.value=0;
-  input.connect(iceBand).connect(comb).connect(combBack).connect(comb);comb.connect(ice).connect(output);
+  iceBand.connect(comb).connect(combBack).connect(comb);comb.connect(ice).connect(output);
   // Дрожь: a pulsing tremolo on the whole branch.
   const tremble=c.createGain();tremble.gain.value=0;let lfo=null;
   if(c.createOscillator){lfo=c.createOscillator();lfo.frequency.value=4/beat/2;lfo.connect(tremble).connect(shaker.gain);lfo.start();oscillators.push(lfo);}
+  // The costly branches (a 3.6 s hall, an oversampled shaper, a ringing comb)
+  // are plugged in only while their spell sounds, and unplugged once the tail
+  // has died: five racks idling at full cost overloaded phones.
+  const lazy={vault:{entry:convolver,tail:6000},rage:{entry:highpass,tail:400},ice:{entry:iceBand,tail:1500}};
+  const plug=(key,on)=>{
+    const branch=lazy[key];clearTimeout(branch.timer);branch.timer=null;
+    if(on){if(!branch.on){input.connect(branch.entry);branch.on=true;}return;}
+    if(!branch.on)return;
+    branch.timer=setTimeout(()=>{branch.timer=null;if(branch.on){input.disconnect(branch.entry);branch.on=false;}},branch.tail);branch.timer?.unref?.();
+  };
   const previous=Object.fromEntries(SPELL_KEYS.map(k=>[k,-1]));
   return {input,dry,output,shaker,vault,rage,split,echo,fog,ice,tremble,convolver,delays,oscillators,echoDelay,
     apply(values){
       const now=c.currentTime,v=k=>values[k]||0;
-      for(const key of SPELL_KEYS)if(Math.abs(v(key)-previous[key])>.002){this[key].gain.setTargetAtTime(v(key)*LEVEL[key]*(key==='tremble'?.45:1),now,.018);previous[key]=v(key);}
+      for(const key of SPELL_KEYS)if(Math.abs(v(key)-previous[key])>.002){if(lazy[key])plug(key,v(key)>0);this[key].gain.setTargetAtTime(v(key)*LEVEL[key]*(key==='tremble'?.45:1),now,.018);previous[key]=v(key);}
       dry.gain.setTargetAtTime(Math.max(.05,1-v('rage')*.42-v('split')*.18-v('fog')*.85-v('ice')*.35),now,.018);
       shaker.gain.setTargetAtTime(1-v('tremble')*.45,now,.018);
     },
-    dispose(){for(const osc of oscillators)osc.stop();input.disconnect();output.disconnect();shaker.disconnect();}
+    dispose(){for(const branch of Object.values(lazy))clearTimeout(branch.timer);for(const osc of oscillators)osc.stop();input.disconnect();output.disconnect();shaker.disconnect();}
   };
 }

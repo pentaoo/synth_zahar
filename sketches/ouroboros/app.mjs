@@ -1,4 +1,4 @@
-import {OuroborosAudio} from './engine.mjs?v=chains-8';
+import {OuroborosAudio} from './engine.mjs?v=chains-9';
 import {clamp,wrap} from './folk-score.mjs?v=ritual-10';
 import {CreatureLife} from './creature-state.mjs?v=chains-2';
 import {SPELLS,SPELL_WORDS} from './spell-book.mjs?v=chains-2';
@@ -272,7 +272,7 @@ function layoutInk(){
 }
 function resize(){
   const rect=stage.getBoundingClientRect();width=rect.width;height=rect.height;baseRadius=ritualSize(width,height);view.safeTop=parseFloat(getComputedStyle(root).paddingTop)||0;root.dataset.mobile=String(mobileLayout(width,height));
-  renderer?.resize(width,height,devicePixelRatio||1);ink.resize(baseRadius);layoutInk();
+  renderer?.resize(width,height,Math.min(2,devicePixelRatio||1));ink.resize(baseRadius);layoutInk();
 }
 function updateViewUi(scene){
   if(lastIncantation&&!casting&&!spellInput.hasAttribute('aria-invalid')&&feedback.dataset.kind==='spell'){
