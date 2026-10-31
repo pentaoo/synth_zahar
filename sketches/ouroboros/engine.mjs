@@ -1,7 +1,7 @@
 import {renderScore,clamp,DEFAULT_WAVES,BPM} from './folk-score.mjs?v=ritual-10';
 import {SpellBook} from './spell-book.mjs?v=chains-2';
 import {CREATURES} from './ritual-model.mjs';
-import {createSpellRack,silentSpells} from './spell-rack.mjs?v=chains-2';
+import {createSpellRack,silentSpells} from './spell-rack.mjs?v=chains-3';
 import {RitualVoice,voiceDefaults,VOICE_RANGES,speakAloud} from './ritual-voice.mjs?v=chains-5';
 import {channelDefaults,channelValue} from './channel-state.mjs?v=chains-3';
 import {Chains} from './chain-model.mjs?v=chains-2';
@@ -39,7 +39,7 @@ const driveCurve=amount=>{
 };
 const FRICTION=[110,220,82.41];
 const TRANSPORTS={
-  vinyl:{module:'./transport-vinyl-worklet.js?v=scrub-1',processor:'ouroboros-vinyl-transport'},
+  vinyl:{module:'./transport-vinyl-worklet.js?v=scrub-2',processor:'ouroboros-vinyl-transport'},
   slip:{module:'./transport-worklet.js',processor:'ouroboros-transport'}
 };
 
@@ -56,7 +56,9 @@ export class OuroborosAudio {
     if(this.ready) return this.ready;
     const Context=window.AudioContext||window.webkitAudioContext;
     if(!Context) throw new Error('Этот браузер не поддерживает Web Audio.');
-    this.context=new Context({latencyHint:'interactive'});
+    // 'balanced' asks for a larger hardware buffer than 'interactive': on phones the
+    // smallest one (about 4 ms) left no slack and every late block was heard as a crackle.
+    this.context=new Context({latencyHint:'balanced'});
     const resume=this.context.resume();
     this.ready=(async()=>{
       await resume;
@@ -74,7 +76,7 @@ export class OuroborosAudio {
           if(data.ready) resolve();
           else {this.state={...this.state,...data};this.spells.advance(data.travelBeats||0);this.updateSpells();this.voice?.advance(data.travelBeats||0,this.playing,data.speed>0);this.onstate(this.state);}
         };
-        this.transport.port.postMessage({type:'load',stems:score.stems,phraseStems:score.phraseStems.length?score.phraseStems:undefined,beats:score.beats},[...score.stems,...score.phraseStems].map(stem=>stem.buffer));
+        this.transport.port.postMessage({type:'load',stems:score.stems,phraseStems:score.phraseStems.length?score.phraseStems:undefined,beats:score.beats,silent:this.chainMode},[...score.stems,...score.phraseStems].map(stem=>stem.buffer));
       });
       if(this.chainMode)await this.syncChains();
       this.setRate(this.rate);
@@ -100,17 +102,18 @@ export class OuroborosAudio {
     this.analyser=c.createAnalyser();this.analyser.fftSize=1024;this.samples=new Float32Array(1024);this.spectrum=new Uint8Array(512);
     this.analysisState={level:0,low:0,high:0,centroid:0,bass:0,melody:0,drums:0,channels:new Float32Array(3),waveform:this.samples};
     this.master.connect(this.compressor).connect(this.analyser).connect(c.destination);
-    const impulse=this.impulse(.72);
+    // One short room for all three rings: three convolvers cost the audio thread three times as much.
+    this.room=c.createConvolver();this.room.buffer=this.impulse(.72);this.room.connect(this.master);
     this.channels=[0,1,2].map((channel)=>{
       const input=c.createGain(),body=c.createBiquadFilter(),filter=c.createBiquadFilter(),drive=c.createWaveShaper(),preDrive=c.createGain(),makeup=c.createGain(),dry=c.createGain(),pan=c.createStereoPanner(),level=c.createGain(),analyser=c.createAnalyser();
       body.type='peaking';body.frequency.value=140;body.Q.value=.8;body.gain.value=0;
       filter.type='lowpass';filter.Q.value=.65;filter.frequency.value=[2300,5200,8000][channel];drive.curve=driveCurve(1);drive.oversample='2x';preDrive.gain.value=1.6/16;makeup.gain.value=1/Math.tanh(1.6);dry.gain.value=[.85,.88,.76][channel];pan.pan.value=[-.08,.12,0][channel];analyser.fftSize=256;
       if(!this.phraseAudio)this.transport.connect(input,channel);input.connect(body).connect(filter).connect(preDrive).connect(drive).connect(makeup).connect(dry).connect(pan).connect(level).connect(analyser).connect(this.master);
-      const send=c.createGain(),delay=c.createDelay(1),feedback=c.createGain(),echo=c.createGain(),reverb=c.createConvolver(),space=c.createGain();
+      const send=c.createGain(),delay=c.createDelay(1),feedback=c.createGain(),echo=c.createGain(),space=c.createGain(),wet=c.createGain();
       delay.delayTime.value=60/BPM*.75;feedback.gain.value=.18;echo.gain.value=channel===2?.025:.055;
       makeup.connect(send).connect(delay).connect(feedback).connect(delay);delay.connect(echo).connect(pan);
-      reverb.buffer=impulse;space.gain.value=channel===2?.025:.065;send.connect(reverb).connect(space).connect(pan);
-      return {input,body,filter,drive,preDrive,makeup,dry,pan,level,analyser,samples:new Float32Array(256),send,delay,feedback,echo,space,amount:.04};
+      space.gain.value=channel===2?.025:.065;send.connect(space).connect(wet).connect(this.room);
+      return {input,body,filter,drive,preDrive,makeup,dry,pan,level,analyser,samples:new Float32Array(256),send,delay,feedback,echo,space,wet,amount:.04};
     });
     for(let i=0;i<3;i++)this.applyChannel(i);
     if(this.phraseAudio&&this.chainMode){
@@ -221,7 +224,7 @@ export class OuroborosAudio {
     const brightness=macro?state.brightness*(.35+macro.x*2):state.brightness;
     const amount=clamp(state.saturation+(macro?macro.y*.28+macro.energy*.13:0),0,1),strength=1+amount*15;
     nodes.filter.frequency.setTargetAtTime(clamp(brightness,180,16000),now,.025);
-    nodes.level.gain.setTargetAtTime(state.level,now,.02);nodes.pan.pan.setTargetAtTime(state.pan,now,.02);
+    nodes.level.gain.setTargetAtTime(state.level,now,.02);nodes.wet.gain.setTargetAtTime(state.level,now,.02);nodes.pan.pan.setTargetAtTime(state.pan,now,.02);
     nodes.preDrive.gain.setTargetAtTime(strength/16,now,.02);nodes.makeup.gain.setTargetAtTime(1/Math.tanh(strength),now,.02);
     nodes.echo.gain.setTargetAtTime(state.echo+(macro?macro.y*.1:0),now,.04);nodes.space.gain.setTargetAtTime(state.reverb+(macro?macro.y*.13:0),now,.04);
     if(index===2)nodes.body.gain.setTargetAtTime((state.punch-.35)*12,now,.025);
@@ -238,7 +241,7 @@ export class OuroborosAudio {
     if(this.ready)await this.ready.catch(()=>{});
     if(this.context){this.context.onstatechange=null;await this.context.close().catch(()=>{});}
     this.voice?.reset();this.voice=null;this.spells.reset();this.chains.reset();this.ringKeys=['','',''];this.ringOrder.forEach(m=>m.clear());
-    this.context=null;this.transport=null;this.channels=null;this.ready=null;this.master=null;this.analyser=null;this.scratchSend=undefined;this.rate=1;
+    this.context=null;this.transport=null;this.channels=null;this.room=null;this.ready=null;this.master=null;this.analyser=null;this.scratchSend=undefined;this.rate=1;
     this.state={...this.state,phase:0,backgroundPhase:0,rate:1,speed:0,peak:0,playing:false,queued:-1};
     if(intent!==this.playIntent){this.onstate(this.state);return false;}
     return this.play();

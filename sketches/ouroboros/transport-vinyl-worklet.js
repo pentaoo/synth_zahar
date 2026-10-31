@@ -43,6 +43,8 @@ class OuroborosVinylTransport extends AudioWorkletProcessor {
       const stems=data.stems;
       if(!Array.isArray(stems)||stems.length!==3||!stems[0]?.length||stems.some(s=>s.length!==stems[0].length))return;
       this.stems=stems;this.length=stems[0].length;this.beat=this.length/(Number.isFinite(data.beats)&&data.beats>0?data.beats:16);
+      // Chain mode sends silent master stems only to keep the clock: skip reading them.
+      this.silent=!!data.silent;
       this.phraseStems=Array.isArray(data.phraseStems)&&data.phraseStems.length===6&&data.phraseStems.every(s=>s.length===this.length)?data.phraseStems:null;
       this.position=this.mod(this.position);this.cuePosition=this.mod(this.cuePosition);
       this.port.postMessage({ready:true});
@@ -168,7 +170,7 @@ class OuroborosVinylTransport extends AudioWorkletProcessor {
       const carrier=Math.cos(this.carrier);
       this.seed=(Math.imul(this.seed,1664525)+1013904223)>>>0;
       const noise=this.seed/2147483648-1;
-      for(let channel=0;channel<(this.phraseStems?9:3);channel++){
+      for(let channel=0,count=this.silent?0:this.phraseStems?9:3;channel<count;channel++){
         const pcm=channel<3?this.stems[channel]:this.phraseStems[channel-3];
         let value=pcm[ai]+(pcm[an]-pcm[ai])*af;
         if(this.cueMix>0){const old=pcm[bi]+(pcm[bn]-pcm[bi])*bf;value+=(old-value)*this.cueMix;}

@@ -1,4 +1,4 @@
-import {silentSpells} from './spell-rack.mjs?v=chains-2';
+import {silentSpells} from './spell-rack.mjs?v=chains-3';
 import {resolveTarget} from './ritual-model.mjs';
 export const SPELLS=Object.freeze([
   {word:'Свод',key:'vault',rune:'ᛝ',description:'Длинное тёмное пространство',beats:16},
