@@ -1,4 +1,4 @@
-import {OuroborosAudio} from './engine.mjs?v=chains-6';
+import {OuroborosAudio} from './engine.mjs?v=chains-7';
 import {clamp,wrap} from './folk-score.mjs?v=ritual-10';
 import {CreatureLife} from './creature-state.mjs?v=chains-2';
 import {SPELLS,SPELL_WORDS} from './spell-book.mjs?v=chains-2';
@@ -292,8 +292,9 @@ function updateViewUi(scene){
   const vv=window.visualViewport,visibleBottom=vv?Math.min(height,vv.offsetTop+vv.height-stage.getBoundingClientRect().top):height;
   const lineTop=Math.max(8,Math.min(lineY,visibleBottom-spellLine.offsetHeight-8));
   Object.assign(spellLine.style,{left:(mobile?(width-lineWidth)/2:columnX+inset)+'px',top:lineTop+'px',width:lineWidth+'px'});
-  // Desktop: the log runs from 250px (16 + 234) to 16px above the bottom.
-  const logTop=16+234;
+  // Desktop: the log runs from 250px (16 + 234) to 16px above the bottom, and
+  // steps down while the command list under the line is open.
+  const logTop=Math.max(16+234,mobile?0:lineTop+spellLine.offsetHeight+16);
   // Log lines are never wider than the line's underline.
   spellLog.hidden=mobile;Object.assign(spellLog.style,{left:columnX+inset+'px',width:lineWidth+'px',top:logTop+'px',height:Math.max(0,height-logTop-16)+'px'});
   // The line stays in place in an open ring too; the miniature sits top centre.

@@ -4,8 +4,29 @@ const OPTIONAL=['echo','fog','ice','tremble'];
 export const VOICE_RANGES=Object.freeze({level:[0,.6],pitch:[.6,1.4],robot:[0,1],tone:[350,3200],every:[0,64],carrier:[20,140]});
 export const voiceDefaults=()=>({level:.18,pitch:.94,robot:.6,tone:1250,every:16,carrier:43});
 const crush=robot=>{const steps=Math.max(4,Math.round(64-robot*67)),curve=new Float32Array(1024);for(let i=0;i<1024;i++)curve[i]=Math.round(Math.tanh((i/511.5-1)*(1+robot*3.3))*steps)/steps;return curve;};
-// Any typed word without a recording is read by the system voice (Milena where present).
-// It bypasses the robot chain: the browser gives no access to its audio.
+// Any typed word without a recording is synthesised on the page by eSpeak NG
+// (Russian, GPL-3, ~18 MB wasm fetched once from the CDN on the first phrase),
+// so it goes through the same robot chain as the recordings. If eSpeak cannot
+// load, the system voice (Milena where present) reads it outside the chain.
+const ESPEAK='https://cdn.jsdelivr.net/npm/espeak-ng@1.0.2/dist/espeak-ng.js';
+let espeak=null;
+function espeakEngine(){
+  if(!espeak){
+    espeak=(async()=>{
+      const [{default:ESpeakNg},module]=await Promise.all([import(ESPEAK),(async()=>{const r=await fetch(new URL('espeak-ng.wasm',ESPEAK));if(!r.ok)throw new Error('eSpeak '+r.status);return WebAssembly.compile(await r.arrayBuffer());})()]);
+      return {ESpeakNg,module};
+    })();
+    espeak.catch(()=>{espeak=null;});
+  }
+  return espeak;
+}
+// Text → WAV bytes. Each phrase runs the eSpeak command once on the compiled module.
+export async function synthesise(text){
+  const {ESpeakNg,module}=await espeakEngine(),words=String(text).replace(/^[\s-]+/,'').trim();if(!words)return null;
+  const m=await ESpeakNg({arguments:['-v','ru','-s','150','-w','/speech.wav',words],print(){},printErr(){},
+    instantiateWasm(imports,done){WebAssembly.instantiate(module,imports).then(instance=>done(instance,module));return {};}});
+  return m.FS.readFile('/speech.wav');
+}
 let ruVoice=null;
 const pickVoice=synth=>{const list=synth.getVoices?.()||[];ruVoice=list.find(v=>/milena/i.test(v.name))||list.find(v=>/^ru/i.test(v.lang))||ruVoice;return ruVoice;};
 export function speakAloud(text,settings=voiceDefaults(),{onstart,onend}={}){
@@ -39,8 +60,15 @@ export class RitualVoice {
     if(this.active)this.active.playbackRate.setTargetAtTime(v.pitch,now,.03);
     return v;
   }
+  // A typed phrase: synthesised, then played through the robot chain like a recording.
+  async speak(text){
+    const epoch=++this.epoch;let bytes;try{bytes=await synthesise(text);}catch{return false;}
+    if(!bytes||epoch!==this.epoch)return !!bytes;
+    const buffer=await this.context.decodeAudioData(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));
+    if(epoch!==this.epoch)return true;this.buffers.set('typed',buffer);return this.say('typed');
+  }
   say(key){if(!this.enabled||!this.buffers.has(key))return false;this.stop();const source=this.context.createBufferSource();source.buffer=this.buffers.get(key);source.playbackRate.value=this.settings?.pitch??.94;source.connect(this.filter);source.start();this.active=source;this.word=key;this.spoken++;source.onended=()=>{source.disconnect();if(this.active===source)this.active=null;};return true;}
-  advance(heardBeats,playing,forward=true){if(!playing){this.stop();return;}const every=this.settings?.every??16;if(every>0&&heardBeats>=this.nextRecitative&&forward){this.nextRecitative=heardBeats+every;if(!this.active)this.say(this.recitative++%2?'recitative-b':'recitative-a');}}
+  advance(heardBeats,playing,forward=true){if(!playing){if(this.active&&/^recitative/.test(this.word))this.stop();return;}const every=this.settings?.every??16;if(every>0&&heardBeats>=this.nextRecitative&&forward){this.nextRecitative=heardBeats+every;if(!this.active)this.say(this.recitative++%2?'recitative-b':'recitative-a');}}
   stop(){this.epoch++;if(this.active){try{this.active.stop();}catch{}this.active.disconnect();this.active=null;}this.word='';}
   reset(){this.stop();this.nextRecitative=5;this.recitative=0;}
 }

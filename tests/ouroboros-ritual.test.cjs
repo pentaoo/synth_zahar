@@ -41,14 +41,15 @@ test('heard travel drives one cast across reverse crossings and freezes on pause
 test('clearing one phrase leaves the independent all-target voice processing intact',async()=>{
   const [,{SpellBook}]=await modules,b=new SpellBook();b.cast('Свод');b.advance(2);b.cast('Снять',{scope:'phrase',selected:'bass-a'});b.advance(4);assert.equal(b.allVoiceValues().vault,1);assert.equal(b.values('bass-a').vault,0);b.cast('Снять');b.advance(6);assert.equal(b.allVoiceValues().vault,0);
 });
-test('robot speech uses a real node source, preempts recitative, and pause cancels it',async()=>{
+test('robot speech uses a real node source, preempts recitative; pause stops the recitative, stop() cancels any word',async()=>{
   const {RitualVoice}=await import(`${root}/ritual-voice.mjs`),sources=[];
   const param=()=>({value:0}),node=()=>({connect(to){return to;},disconnect(){}});
   const c={createBiquadFilter:()=>({...node(),frequency:param(),Q:param()}),createWaveShaper:node,createGain:()=>({...node(),gain:param()}),createOscillator:()=>({...node(),frequency:param(),start(){}}),createBufferSource:()=>{const s={...node(),playbackRate:param(),start(){this.started=true;},stop(){this.stopped=true;}};sources.push(s);return s;}};
   const voice=new RitualVoice(c,node());for(const key of ['recitative-a','recitative-b','vault'])voice.buffers.set(key,{});
   voice.advance(5,true);assert.equal(voice.word,'recitative-a');assert.equal(sources[0].started,true);
   voice.say('vault');assert.equal(sources[0].stopped,true);assert.equal(voice.word,'vault');assert.equal(voice.spoken,2);
-  voice.advance(7,false);assert.equal(sources[1].stopped,true);assert.equal(voice.active,null);voice.advance(7,true);assert.equal(voice.active,null);
+  voice.advance(7,false);assert.equal(voice.word,'vault','a word said while paused is not cut off');voice.stop();assert.equal(sources[1].stopped,true);assert.equal(voice.active,null);voice.advance(7,true);assert.equal(voice.active,null);
+  voice.say('recitative-b');voice.advance(9,false);assert.equal(voice.active,null,'paused, the recitative stops');
 });
 test('both bites end at the neighbour gullet, material coordinates survive pinch',async()=>{
   const [,,,g,base]=await modules,skins=JSON.parse(fs.readFileSync(`${root}/assets/ritual/skins.json`));

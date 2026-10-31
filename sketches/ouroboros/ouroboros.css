@@ -41,7 +41,7 @@ fieldset label{clear:both;display:grid;grid-template-columns:1fr auto;align-item
 fieldset label+label{margin-top:3px}
 fieldset output{color:#000;font:var(--type-micro);font-variant-numeric:tabular-nums}
 fieldset .choice-row{display:flex;justify-content:space-between;gap:15px;margin-bottom:5px}
-select{border:0;background:#fff;border-bottom:1px solid #000;border-radius:0;font:var(--type-caption);padding:2px 14px 3px 0;max-width:180px}
+select{border:0;background:transparent;border-bottom:1px solid #000;border-radius:0;font:var(--type-caption);padding:2px 14px 3px 0;max-width:180px}
 input[type="range"]{grid-column:1/-1;width:100%;height:21px;margin:0;accent-color:#000;cursor:ew-resize;-webkit-appearance:none;background:none}
 input[type="range"]::-webkit-slider-runnable-track{height:1px;background:#000}
 input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:9px;border-radius:50%;background:#000;margin-top:-4px}
@@ -67,7 +67,7 @@ input[type="range"]::-moz-range-thumb{width:9px;height:9px;border:0;background:#
 [data-mobile="true"] .spell-lexicon button{min-height:36px}
 [data-mobile="true"] .spell-line{width:min(330px,calc(100vw - 40px))}
 @media(max-height:520px){[data-mobile="true"] .spell-lexicon{display:none}}
-dialog{background:#fff;color:#000;border:1px solid #000;padding:44px;max-width:min(530px,calc(100vw - 32px));max-height:calc(100dvh - 40px);overflow:auto}
+dialog{background:transparent;color:#000;border:1px solid #000;padding:44px;max-width:min(530px,calc(100vw - 32px));max-height:calc(100dvh - 40px);overflow:auto}
 dialog::backdrop{background:#fff}
 dialog h2{font:var(--type-title);margin:0 0 28px}
 dialog p{font:var(--type-body);color:#000}
@@ -86,7 +86,7 @@ summary{cursor:pointer}
 [data-view="focus"] .spell-lexicon{display:none}
 .stage[data-hover="rune"] #canvas{cursor:pointer}
 .channel-panel{padding:8px 10px 12px 8px}
-.voice-panel{z-index:6;background:#fff}
+.voice-panel{z-index:6}
 .channel-title .panel-close{margin-left:auto;font:var(--type-large);min-width:36px;min-height:36px;padding:0}
 .text-button{padding:6px 0;font:var(--type-caption);border-bottom:1px solid #000;margin-top:6px}
 .spell-lexicon .lexicon-gap{width:100%;height:0}
@@ -97,20 +97,17 @@ summary{cursor:pointer}
 [data-mobile="true"] .spell-lexicon .lexicon-gap{width:10px;flex:none}
 [data-mobile="true"] #spell-feedback{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
 /* The log: everything entered in the line, small and centred in the right
-   column, one entry per line, ragged on both sides. Nothing clips it: the
-   text runs on down the page and a white fade over the last 322px of the
-   screen lets it dissolve instead of being cut. */
+   column, one entry per line, ragged on both sides. Nothing clips it and
+   nothing covers it: only the page background is white. */
 .spell-log{position:absolute;z-index:4;pointer-events:none}
-.spell-log::after{content:"";position:absolute;left:0;right:0;bottom:-16px;height:min(322px,40vh);background:linear-gradient(rgba(255,255,255,0),#fff);pointer-events:none}
 .spell-log[hidden]{display:none}
-.spell-log .scroll{background:#fff}
 .spell-log p{margin:0;font:var(--type-log);text-align:center;overflow-wrap:anywhere}
 .spell-log p span{display:block}
 /* Desktop: nothing is written on the left; what was said goes to the log. */
 [data-mobile="false"] #spell-feedback{display:none}
 /* Desktop: the list of every command, under the line while it has focus. */
 .command-list{display:none}
-[data-mobile="false"] .spell-line:focus-within .command-list:not(:empty){display:block;background:#fff;padding:12px 0 16px}
+[data-mobile="false"] .spell-line:focus-within .command-list:not(:empty){display:block;padding:12px 0 16px}
 .command-group{display:flex;flex-wrap:wrap;gap:0 12px;align-items:baseline;font:var(--type-caption)}
 .command-group+.command-group{margin-top:6px}
 .command-group span{flex:0 0 100%;font:var(--type-micro);margin-bottom:2px}

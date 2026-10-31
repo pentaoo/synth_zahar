@@ -2,7 +2,7 @@ import {renderScore,clamp,DEFAULT_WAVES,BPM} from './folk-score.mjs?v=ritual-10'
 import {SpellBook} from './spell-book.mjs?v=chains-2';
 import {CREATURES} from './ritual-model.mjs';
 import {createSpellRack,silentSpells} from './spell-rack.mjs?v=chains-2';
-import {RitualVoice,voiceDefaults,VOICE_RANGES,speakAloud} from './ritual-voice.mjs?v=chains-3';
+import {RitualVoice,voiceDefaults,VOICE_RANGES,speakAloud} from './ritual-voice.mjs?v=chains-4';
 import {channelDefaults,channelValue} from './channel-state.mjs?v=chains-3';
 import {Chains} from './chain-model.mjs?v=chains-2';
 import {renderRing,masterStems} from './chain-score.mjs?v=chains-2';
@@ -133,7 +133,7 @@ export class OuroborosAudio {
     }
   }
   castSpell(word,target){
-    const result=this.spells.cast(word,target);if(result.ok){this.updateSpells();if(!this.voice?.say(result.spell.key))this.speakWord(result.spell.word);}return result;
+    const result=this.spells.cast(word,target);if(result.ok){this.updateSpells();if(this.voice?.say(result.spell.key))this.openVoice();else this.speakWord(result.spell.word);}return result;
   }
   // The snake sounding now in each ring, from the record position of that ring.
   activeSnake(index){
@@ -200,8 +200,16 @@ export class OuroborosAudio {
     this.voiceSettings[key]=Math.max(range[0],Math.min(range[1],value));this.voice?.configure(this.voiceSettings);return true;
   }
   // Every typed word is read aloud: recorded words through the robot chain, the rest by the system voice.
-  speakWord(text){
+  // Paused, the master opens for the voice alone: the record's envelope stays shut.
+  openVoice(){if(!this.playing&&this.master)this.master.gain.setTargetAtTime(.62,this.context.currentTime,.015);}
+  // Every typed word goes through the voice of the abyss and its settings.
+  async speakWord(text){
     this.voice?.stop();const speech=this.liveSpeech={on:false};
+    try{await this.initialize();if(this.context.state!=='running')await this.context.resume();}catch{}
+    if(this.voice){
+      this.openVoice();
+      if(await this.voice.speak(text))return true;
+    }
     return speakAloud(text,this.voiceSettings,{onstart:()=>{speech.on=true;},onend:()=>{speech.on=false;}});
   }
   sayVoice(){return this.voice?.say(this.voice.recitative++%2?'recitative-b':'recitative-a')||false;}
