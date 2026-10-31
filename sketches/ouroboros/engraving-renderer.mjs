@@ -234,7 +234,7 @@ export class EngravingRenderer {
       x.font=size+'px "Noto Sans Runic","Segoe UI Historic","Apple Symbols",Georgia,serif';
       if(k===active){x.beginPath();x.arc(at.x,at.y,size*.75,0,TAU);x.lineWidth=1.2;x.stroke();}
       x.lineWidth=1;if(pending)x.strokeText(runeFor(c.channel,cell),at.x,at.y);else x.fillText(runeFor(c.channel,cell),at.x,at.y);
-      x.font=Math.round(size*.45)+'px Georgia,serif';x.fillText(c.channel===2?['','н','р','с'][Number(cell)]||'·':cell==='x'?'к':cell,at.x,at.y+size*1.05);
+      x.font=Math.round(size*.45)+'px Alegreya,Georgia,serif';x.fillText(c.channel===2?['','н','р','с'][Number(cell)]||'·':cell==='x'?'к':cell,at.x,at.y+size*1.05);
       this.runeHits.push({x:at.x,y:at.y,r:size*.85,uid:c.uid,index:k});
     }
     x.restore();

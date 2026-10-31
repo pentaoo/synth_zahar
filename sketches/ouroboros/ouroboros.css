@@ -1,6 +1,12 @@
+/* Alegreya and Alegreya SC (SIL OFL 1.1, assets/fonts/OFL.txt), regular weight only. */
+@font-face{font-family:'Alegreya';font-style:normal;font-weight:400;font-display:swap;src:url(./assets/fonts/alegreya-cyrillic-400-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Alegreya';font-style:normal;font-weight:400;font-display:swap;src:url(./assets/fonts/alegreya-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Alegreya SC';font-style:normal;font-weight:400;font-display:swap;src:url(./assets/fonts/alegreya-sc-cyrillic-400-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Alegreya SC';font-style:normal;font-weight:400;font-display:swap;src:url(./assets/fonts/alegreya-sc-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 :root{color-scheme:light;--paper:#fff;--ink:#000;
   /* Colour rule: only pure black #000 and pure white #fff, no greys or tints. */
-  --serif:Georgia,"Times New Roman",serif;
+  --serif:Alegreya,Georgia,"Times New Roman",serif;
+  --small-caps:"Alegreya SC",Alegreya,Georgia,serif; /* Малая капитель: подписи групп */
   /* Seven text styles. Every text on the page uses one of them. */
   --type-title:400 28px/1.1 var(--serif);   /* Заголовок: имя кольца и змеи, заголовок окна */
   --type-large:400 24px/1.2 var(--serif);   /* Крупный: строка заклинаний, знаки ↵ и × */
@@ -36,7 +42,7 @@ canvas{position:absolute;inset:0;display:block;width:100%;height:100%}
 h2{font:var(--type-title);letter-spacing:-.6px;margin:0}
 fieldset{border:0;margin:0 0 10px;background:none;padding:0;min-width:0}
 fieldset:last-child{margin-bottom:0}
-legend{float:left;width:100%;font:var(--type-lead);margin:0 0 4px;padding:0}
+legend{float:left;width:100%;font:var(--type-lead);font-family:var(--small-caps);margin:0 0 4px;padding:0}
 fieldset label{clear:both;display:grid;grid-template-columns:1fr auto;align-items:center;font:var(--type-caption);gap:0 12px}
 fieldset label+label{margin-top:3px}
 fieldset output{color:#000;font:var(--type-micro);font-variant-numeric:tabular-nums}
@@ -77,7 +83,7 @@ dialog p{font:var(--type-body);color:#000}
 .scratch-choice button[aria-pressed="true"]{border-bottom-color:#000}
 dialog .routing{font:var(--type-caption)}
 details{margin:20px 0;font:var(--type-caption)}
-summary{cursor:pointer}
+summary{cursor:pointer;font-family:var(--small-caps)}
 @media(max-width:850px){.channel-panel{bottom:40px;width:290px;left:28px}}
 @media(max-width:600px){.channel-panel{bottom:30px;width:min(280px,70vw);max-height:calc(100dvh - 250px)}dialog{padding:40px 26px}fieldset{margin-bottom:16px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
@@ -110,5 +116,5 @@ summary{cursor:pointer}
 [data-mobile="false"] .spell-line:focus-within .command-list:not(:empty){display:block;padding:12px 0 16px}
 .command-group{display:flex;flex-wrap:wrap;gap:0 12px;align-items:baseline;font:var(--type-caption)}
 .command-group+.command-group{margin-top:6px}
-.command-group span{flex:0 0 100%;font:var(--type-micro);margin-bottom:2px}
+.command-group span{flex:0 0 100%;font:var(--type-micro);font-family:var(--small-caps);margin-bottom:2px}
 .command-group button{padding:3px 0;font:var(--type-caption)}

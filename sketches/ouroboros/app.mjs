@@ -14,7 +14,7 @@ import {ViewState,Finale} from './view-state.mjs?v=chains-2';
 import {InkMass} from './ink-physics.mjs?v=chains-2';
 import {Typewriter} from './invitations.mjs?v=chains-2';
 import {commandGroups} from './commands.mjs?v=chains-1';
-import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-11';
+import {EngravingRenderer} from './engraving-renderer.mjs?v=chains-12';
 
 const $=id=>document.getElementById(id),root=$('ouroboros'),stage=$('stage'),canvas=$('canvas'),inkButton=$('ink'),probe=$('audio-state'),panel=$('channel-panel'),minimap=$('minimap'),dialog=$('sound-dialog');
 const voicePanel=$('voice-panel'),spellLine=$('spell-line'),spellInput=$('spell-input'),feedback=$('spell-feedback'),life=new CreatureLife(),touchPinch=new TouchPinch();
