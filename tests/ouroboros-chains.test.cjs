@@ -102,7 +102,7 @@ test('every typed word is read aloud: words without a recording go to the system
   assert.equal(speakAloud('Лёха Жги'),false,'no speech engine, nothing to do');
   const spoken=[];let cancelled=0;
   globalThis.SpeechSynthesisUtterance=class{constructor(text){this.text=text;}};
-  globalThis.speechSynthesis={cancel(){cancelled++;},speak(u){spoken.push(u);u.onstart();u.onend();},getVoices:()=>[{name:'Alex',lang:'en-US'},{name:'Milena',lang:'ru-RU'}]};
+  globalThis.speechSynthesis={cancel(){cancelled++;},speak(u){spoken.push(u);u.onstart();u.onend();},getVoices:()=>[{name:'Alex',lang:'en-US'},{name:'Milena',lang:'ru-RU'},{name:'Yuri',lang:'ru-RU'}]};
   let started=false,ended=false;
   assert.equal(speakAloud('  Лёха Жги ',voiceDefaults(),{onstart:()=>started=true,onend:()=>ended=true}),true);
   assert.equal(spoken[0].text,'Лёха Жги');assert.equal(spoken[0].voice.name,'Milena');assert.equal(spoken[0].lang,'ru-RU');

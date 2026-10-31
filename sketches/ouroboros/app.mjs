@@ -1,4 +1,4 @@
-import {OuroborosAudio} from './engine.mjs?v=chains-7';
+import {OuroborosAudio} from './engine.mjs?v=chains-8';
 import {clamp,wrap} from './folk-score.mjs?v=ritual-10';
 import {CreatureLife} from './creature-state.mjs?v=chains-2';
 import {SPELLS,SPELL_WORDS} from './spell-book.mjs?v=chains-2';

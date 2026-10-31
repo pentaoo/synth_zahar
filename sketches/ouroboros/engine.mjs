@@ -2,7 +2,7 @@ import {renderScore,clamp,DEFAULT_WAVES,BPM} from './folk-score.mjs?v=ritual-10'
 import {SpellBook} from './spell-book.mjs?v=chains-2';
 import {CREATURES} from './ritual-model.mjs';
 import {createSpellRack,silentSpells} from './spell-rack.mjs?v=chains-2';
-import {RitualVoice,voiceDefaults,VOICE_RANGES,speakAloud} from './ritual-voice.mjs?v=chains-4';
+import {RitualVoice,voiceDefaults,VOICE_RANGES,speakAloud} from './ritual-voice.mjs?v=chains-5';
 import {channelDefaults,channelValue} from './channel-state.mjs?v=chains-3';
 import {Chains} from './chain-model.mjs?v=chains-2';
 import {renderRing,masterStems} from './chain-score.mjs?v=chains-2';
@@ -202,14 +202,10 @@ export class OuroborosAudio {
   // Every typed word is read aloud: recorded words through the robot chain, the rest by the system voice.
   // Paused, the master opens for the voice alone: the record's envelope stays shut.
   openVoice(){if(!this.playing&&this.master)this.master.gain.setTargetAtTime(.62,this.context.currentTime,.015);}
-  // Every typed word goes through the voice of the abyss and its settings.
+  // A typed word without a recording: the system voice, with the level and pitch from the voice settings.
   async speakWord(text){
     this.voice?.stop();const speech=this.liveSpeech={on:false};
     try{await this.initialize();if(this.context.state!=='running')await this.context.resume();}catch{}
-    if(this.voice){
-      this.openVoice();
-      if(await this.voice.speak(text))return true;
-    }
     return speakAloud(text,this.voiceSettings,{onstart:()=>{speech.on=true;},onend:()=>{speech.on=false;}});
   }
   sayVoice(){return this.voice?.say(this.voice.recitative++%2?'recitative-b':'recitative-a')||false;}
