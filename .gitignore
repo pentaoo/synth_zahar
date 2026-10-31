@@ -15,6 +15,21 @@ Thumbs.db
 *.swp
 *.tmp
 
+# Local AI assistant instructions, context and generation logs
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.agents/
+.claude/
+.codex/
+.cursor/
+.cursorrules
+.github/copilot-instructions.md
+design/ouroboros-brief/
+**/*PROMPT*.md
+**/GENERATION.json
+**/GENERATION.md
+
 # macOS Finder duplicates ("file 2.png", "folder 2")
 * 2
 * 2.*
